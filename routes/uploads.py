@@ -7,8 +7,10 @@ from werkzeug.utils import secure_filename
 upload_bp = Blueprint("uploads", __name__)
 
 # ✅ Replace with this:
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+UPLOAD_FOLDER = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "uploads"
+)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls'}
 
 def allowed_file(filename):
