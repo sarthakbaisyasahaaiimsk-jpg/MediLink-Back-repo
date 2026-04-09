@@ -1,12 +1,11 @@
 setuptools>=65.0.0
-gunicorn==20.1.0
+gunicorn>=21.2.0
 flask
 flask-sqlalchemy
 flask-jwt-extended
 flask-cors
 werkzeug
 python-multipart
-python-socketio
 python-socketio[client]
 python-engineio
 cryptography
