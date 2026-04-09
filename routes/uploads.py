@@ -2,16 +2,17 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 import os
 import uuid
+import io
 from werkzeug.utils import secure_filename
 from supabase import create_client
 
 upload_bp = Blueprint("uploads", __name__)
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'mp3', 'wav', 'ogg', 'webm'}
 
 def get_supabase():
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = os.environ.get("SUPABASE_KEY", "").strip()
     return create_client(url, key)
 
 def allowed_file(filename):
@@ -32,23 +33,20 @@ def upload_file():
         if not allowed_file(file.filename):
             return jsonify(error="File type not allowed"), 400
 
-        # Generate unique filename
         safe_name = secure_filename(file.filename)
         filename = f"{uuid.uuid4()}_{safe_name}"
 
-        # Read file bytes
         file_bytes = file.read()
         content_type = file.content_type or 'application/octet-stream'
 
-        # Upload to Supabase Storage
         supabase = get_supabase()
-        res = supabase.storage.from_("uploads").upload(
+
+        supabase.storage.from_("uploads").upload(
             path=filename,
-            file=file_bytes,
+            file=io.BytesIO(file_bytes),
             file_options={"content-type": content_type}
         )
 
-        # Get public URL
         public_url = supabase.storage.from_("uploads").get_public_url(filename)
 
         return jsonify({
