@@ -6,7 +6,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
     email = db.Column(db.String(120), unique=True)
-    phone = db.Column(db.String(30), unique=True, nullable=True)
+    phone = db.Column(db.String(30), nullable=True)
     password = db.Column(db.String(200))
     full_name = db.Column(db.String(120), nullable=True)
     is_verified = db.Column(db.Boolean, default=False)

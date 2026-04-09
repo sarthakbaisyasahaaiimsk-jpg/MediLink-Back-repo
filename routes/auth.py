@@ -35,18 +35,27 @@ def register():
     if admin_code and admin_code == os.environ.get('ADMIN_SECRET', 'admin-secret'):
         is_admin = True
 
+    import uuid
+
+if not user:
+    base_username = email.split('@')[0]
+    unique_username = f"{base_username}_{uuid.uuid4().hex[:6]}"
+
     user = User(
-        username=data.get("username"),
-        email=data.get("email"),
-        phone=data.get("phone"),
-        full_name=data.get("full_name"),
-        password=generate_password_hash(data.get("password")),
-        verification_state='pending',
-        is_verified=False,
-        email_verified=False,
+        username=unique_username,
+        email=email,
+        phone=None,
+        password=None,
+        full_name=user_info.get('name', 'Google User'),
+        verification_state='verified',
+        is_verified=True,
+        email_verified=True,
         phone_verified=False,
-        is_admin=is_admin
+        google_id=google_id,
+        is_admin=False
     )
+    db.session.add(user)
+    db.session.commit()
     db.session.add(user)
     db.session.commit()
 
@@ -229,14 +238,18 @@ def google_callback():
     user = User.query.filter_by(google_id=google_id).first()
     if not user:
         user = User(
-            username=email.split('@')[0],
-            email=email,
-            full_name=user_info.get('name', 'Google User'),
-            verification_state='verified',
-            is_verified=True,
-            email_verified=True,
-            google_id=google_id
-        )
+         username=email.split('@')[0],
+          email=email,
+          phone=None,                 # ✅ IMPORTANT FIX
+         password=None,              # ✅ IMPORTANT FIX
+         full_name=user_info.get('name', 'Google User'),
+         verification_state='verified',
+         is_verified=True,
+         email_verified=True,
+         phone_verified=False,
+         google_id=google_id,
+         is_admin=False
+     )
         db.session.add(user)
         db.session.commit()
 
