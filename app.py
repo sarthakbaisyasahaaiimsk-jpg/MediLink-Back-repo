@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, session, send_from_directory
+from flask import Flask, session
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from config import Config
@@ -49,7 +49,6 @@ def auto_add_missing_columns(app):
             sql_type = col.type.compile(db.engine.dialect)
             query = f'ALTER TABLE "{table_name}" ADD COLUMN "{col.name}" {sql_type}'
 
-            # Fix for NOT NULL
             if not col.nullable:
                 query += ' NOT NULL'
 
@@ -72,8 +71,9 @@ def create_app():
     app.config.from_object(Config)
 
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_COOKIE_SECURE'] = False
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
 
     db.init_app(app)
     jwt.init_app(app)
@@ -102,15 +102,6 @@ def create_app():
         supports_credentials=True,
         resources={r"/api/*": {"origins": ["http://localhost:5173", "https://medilink-front-repo.onrender.com"]}}
     )
-
-    # ✅ FIX 1: Use absolute path for uploads folder
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-    # ✅ FIX 2: Serve uploaded files so they're accessible in the browser
-    @app.route('/uploads/<filename>')
-    def uploaded_file(filename):
-        return send_from_directory(UPLOAD_FOLDER, filename)
 
     # Blueprints
     from routes.auth import auth_bp
@@ -156,4 +147,3 @@ app, socketio = create_app()
 
 # if __name__ == "__main__":
 #     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
-
