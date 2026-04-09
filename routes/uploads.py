@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 import os
 import uuid
-import io
 from werkzeug.utils import secure_filename
 from supabase import create_client
 
@@ -36,6 +35,7 @@ def upload_file():
         safe_name = secure_filename(file.filename)
         filename = f"{uuid.uuid4()}_{safe_name}"
 
+        # ✅ Read as raw bytes — Supabase client requires bytes not BytesIO
         file_bytes = file.read()
         content_type = file.content_type or 'application/octet-stream'
 
@@ -43,7 +43,7 @@ def upload_file():
 
         supabase.storage.from_("uploads").upload(
             path=filename,
-            file=io.BytesIO(file_bytes),
+            file=file_bytes,
             file_options={"content-type": content_type}
         )
 
