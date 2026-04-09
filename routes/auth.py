@@ -1,11 +1,9 @@
-
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import User, OtpCode
 from extensions import db
-from flask import url_for, redirect, session, current_app 
-from flask import url_for, redirect, session
+from flask import url_for, redirect, session, current_app
 from authlib.integrations.flask_client import OAuth
 from config import Config
 import os
@@ -18,9 +16,8 @@ auth_bp = Blueprint("auth", __name__)
 
 def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
- 
 
- 
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.json
@@ -53,27 +50,38 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    token = create_access_token(identity=user.id)
+    # ✅ identity must be a string for Flask-JWT-Extended v4+
+    token = create_access_token(identity=str(user.id))
     return jsonify(
         msg="registered",
         token=token,
         user=user.to_dict()
     ), 201
 
+
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.json
     user = User.query.filter_by(email=data.get("email")).first()
-    
-    if user and check_password_hash(user.password, data.get("password")):
-        token = create_access_token(identity=user.id)
+
+    if not user:
+        return jsonify(error="invalid credentials"), 401
+
+    # ✅ User signed up via Google — has no password
+    if not user.password:
+        return jsonify(error="This account uses Google login. Please sign in with Google."), 401
+
+    if check_password_hash(user.password, data.get("password")):
+        # ✅ identity must be a string for Flask-JWT-Extended v4+
+        token = create_access_token(identity=str(user.id))
         return jsonify(
             access_token=token,
             token=token,
             user=user.to_dict()
         ), 200
-    
+
     return jsonify(error="invalid credentials"), 401
+
 
 @auth_bp.route('/send-otp', methods=['POST'])
 def send_otp():
@@ -92,10 +100,10 @@ def send_otp():
     db.session.add(otp)
     db.session.commit()
 
-    # Add SMS/email sending integration here
     print(f"DEBUG OTP for {email}/{phone}: {code}")
 
     return jsonify(message='OTP sent'), 200
+
 
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
@@ -122,11 +130,12 @@ def verify_otp():
 
     return jsonify(message='OTP verified', user=user.to_dict()), 200
 
+
 @auth_bp.route('/verify-doctor', methods=['POST'])
 @jwt_required()
 def verify_doctor():
     data = request.json or {}
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # ✅ convert back to int for DB lookup
     user = User.query.get(user_id)
     if not user:
         return jsonify(error='User not found'), 404
@@ -142,9 +151,7 @@ def verify_doctor():
     user.nmc_number = registration_number
     user.degree = degree
 
-    # Simulated registry check. Replace with real NMC/SMC/NBE API query.
     registry_ok = False
-    # Hardcoded sample registry for offline mode.
     if registration_number.startswith('NMC-'):
         registry_ok = True
     elif registration_number.startswith('SMC-'):
@@ -164,20 +171,22 @@ def verify_doctor():
 
     return jsonify(is_verified=user.is_verified, verification_state=user.verification_state, user=user.to_dict()), 200
 
+
 @auth_bp.route('/admin/users', methods=['GET'])
 @jwt_required()
 def get_all_users():
-    admin_user = User.query.get(get_jwt_identity())
+    admin_user = User.query.get(int(get_jwt_identity()))  # ✅ convert to int
     if not admin_user or not admin_user.is_admin:
         return jsonify(error='admin access required'), 403
 
     users = User.query.all()
     return jsonify(users=[u.to_dict() for u in users]), 200
 
+
 @auth_bp.route('/admin/verify-user', methods=['POST'])
 @jwt_required()
 def admin_verify_user():
-    admin_user = User.query.get(get_jwt_identity())
+    admin_user = User.query.get(int(get_jwt_identity()))  # ✅ convert to int
     if not admin_user or not admin_user.is_admin:
         return jsonify(error='admin access required'), 403
 
@@ -197,8 +206,6 @@ def admin_verify_user():
 @auth_bp.route('/ocr-degree', methods=['POST'])
 @jwt_required()
 def ocr_degree():
-    data = request.json or {}
-    # in real code run OCR on uploaded file, here we simulate
     return jsonify(text='Simulated OCR degree text'), 200
 
 
@@ -212,13 +219,13 @@ def google_login():
 @auth_bp.route("/google/callback")
 def google_callback():
     google = current_app.oauth.google
-    token = google.authorize_access_token()  # this line checks session state
+    token = google.authorize_access_token()
     resp = google.get("https://openidconnect.googleapis.com/v1/userinfo", token=token)
     user_info = resp.json()
-    
+
     google_id = user_info['sub']
     email = user_info['email']
-    
+
     user = User.query.filter_by(google_id=google_id).first()
     if not user:
         user = User(
@@ -232,26 +239,25 @@ def google_callback():
         )
         db.session.add(user)
         db.session.commit()
-    
-    access_token = create_access_token(identity=user.id)
-    
-    # Redirect to frontend with token
+
+    # ✅ identity must be a string for Flask-JWT-Extended v4+
+    access_token = create_access_token(identity=str(user.id))
+
     frontend_redirect = f"http://localhost:5173/auth/callback?token={access_token}"
     return redirect(frontend_redirect)
 
 
+# ✅ @jwt_required() so token is actually validated
 @auth_bp.route("/me", methods=["GET"])
+@jwt_required()
 def get_current_user():
-    from flask_jwt_extended import jwt_required, get_jwt_identity
-    
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # ✅ convert back to int for DB lookup
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify(error="User not found"), 404
-        
+
         return jsonify(user.to_dict()), 200
-    except Exception:
-        # No token or invalid JWT - return unauthenticated
-        return jsonify(user=None, authenticated=False), 401
+    except Exception as e:
+        return jsonify(error="Authentication failed", message=str(e)), 401

@@ -6,7 +6,9 @@ from werkzeug.utils import secure_filename
 
 upload_bp = Blueprint("uploads", __name__)
 
-UPLOAD_FOLDER = "uploads"
+# ✅ Replace with this:
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls'}
 
 def allowed_file(filename):
@@ -47,4 +49,5 @@ def upload_file():
             "filepath": filepath
         }), 200
     except Exception as e:
-        return jsonify(error=str(e)), 500
+       print("UPLOAD ERROR:", repr(e))   # ✅ indented
+       return jsonify(error=str(e)), 500
