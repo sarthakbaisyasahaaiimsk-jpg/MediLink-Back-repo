@@ -2,17 +2,12 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 import os
 import uuid
+import requests
 from werkzeug.utils import secure_filename
-from supabase import create_client
 
 upload_bp = Blueprint("uploads", __name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'mp3', 'wav', 'ogg', 'webm'}
-
-def get_supabase():
-    url = os.environ.get("SUPABASE_URL", "").strip()
-    key = os.environ.get("SUPABASE_KEY", "").strip()
-    return create_client(url, key)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -35,19 +30,28 @@ def upload_file():
         safe_name = secure_filename(file.filename)
         filename = f"{uuid.uuid4()}_{safe_name}"
 
-        # ✅ Read as raw bytes — Supabase client requires bytes not BytesIO
         file_bytes = file.read()
         content_type = file.content_type or 'application/octet-stream'
 
-        supabase = get_supabase()
+        supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+        supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
 
-        supabase.storage.from_("uploads").upload(
-            path=filename,
-            file=file_bytes,
-            file_options={"content-type": content_type}
-        )
+        # ✅ Upload directly via Supabase REST API — no Python client needed
+        upload_url = f"{supabase_url}/storage/v1/object/uploads/{filename}"
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": content_type,
+            "x-upsert": "true"
+        }
 
-        public_url = supabase.storage.from_("uploads").get_public_url(filename)
+        res = requests.post(upload_url, data=file_bytes, headers=headers)
+
+        if res.status_code not in (200, 201):
+            print("SUPABASE UPLOAD FAILED:", res.status_code, res.text)
+            return jsonify(error=f"Storage upload failed: {res.text}"), 500
+
+        # ✅ Build public URL
+        public_url = f"{supabase_url}/storage/v1/object/public/uploads/{filename}"
 
         return jsonify({
             "message": "File uploaded successfully",
