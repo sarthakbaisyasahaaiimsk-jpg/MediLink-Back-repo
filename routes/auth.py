@@ -243,7 +243,8 @@ def google_callback():
     # ✅ identity must be a string for Flask-JWT-Extended v4+
     access_token = create_access_token(identity=str(user.id))
 
-    frontend_redirect = f"http://localhost:5173/auth/callback?token={access_token}"
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+    frontend_redirect = f"{frontend_url}/auth/callback?token={access_token}"
     return redirect(frontend_redirect)
 
 

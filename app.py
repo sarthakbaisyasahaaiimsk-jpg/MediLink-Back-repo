@@ -92,7 +92,7 @@ def create_app():
     # WebSocket
     socketio = SocketIO(
         app,
-        cors_allowed_origins=["http://localhost:5173"],
+        cors_allowed_origins=["http://localhost:5173", "https://medilink-front-repo.onrender.com"],
         manage_session=True
     )
 
@@ -100,7 +100,7 @@ def create_app():
     CORS(
         app,
         supports_credentials=True,
-        resources={r"/api/*": {"origins": ["http://localhost:5173"]}}
+        resources={r"/api/*": {"origins": ["http://localhost:5173", "https://medilink-front-repo.onrender.com"]}}
     )
 
     # ✅ FIX 1: Use absolute path for uploads folder
@@ -154,5 +154,6 @@ def create_app():
 
 app, socketio = create_app()
 
-if __name__ == "__main__":
-    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+# if __name__ == "__main__":
+#     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+

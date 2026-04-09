@@ -9,6 +9,7 @@ python-multipart
 python-socketio[client]
 python-engineio
 cryptography
+eventlet>=0.33.3
 flask-socketio
 python-dotenv
 psycopg2-binary
