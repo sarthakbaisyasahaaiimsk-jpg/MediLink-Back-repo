@@ -92,64 +92,75 @@ def login():
 def google_login():
     google = current_app.oauth.google
     redirect_uri = url_for("auth.google_callback", _external=True)
+    print("DEBUG GOOGLE LOGIN: redirect_uri =", redirect_uri)
     return google.authorize_redirect(redirect_uri)
 
 
 # =========================
-# GOOGLE CALLBACK (FIXED)
+# GOOGLE CALLBACK
 # =========================
 @auth_bp.route("/google/callback")
 def google_callback():
-    google = current_app.oauth.google
+    try:
+        google = current_app.oauth.google
 
-    token = google.authorize_access_token()
-    resp = google.get(
-        "https://openidconnect.googleapis.com/v1/userinfo",
-        token=token
-    )
-    user_info = resp.json()
+        token = google.authorize_access_token()
+        resp = google.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            token=token
+        )
+        user_info = resp.json()
+        print("DEBUG USER INFO:", user_info)
 
-    google_id = user_info["sub"]
-    email = user_info["email"]
+        google_id = user_info["sub"]
+        email = user_info["email"]
 
-    # 1. Check google_id first
-    user = User.query.filter_by(google_id=google_id).first()
+        # 1. Check google_id first
+        user = User.query.filter_by(google_id=google_id).first()
 
-    if not user:
-        # 2. Check email existing user
-        user = User.query.filter_by(email=email).first()
+        if not user:
+            # 2. Check email existing user
+            user = User.query.filter_by(email=email).first()
 
-        if user:
-            # attach google to existing account
-            user.google_id = google_id
-            user.email_verified = True
-            user.is_verified = True
-        else:
-            # create new user safely
-            base_username = email.split("@")[0]
-            unique_username = f"{base_username}_{uuid.uuid4().hex[:6]}"
+            if user:
+                user.google_id = google_id
+                user.email_verified = True
+                user.is_verified = True
+            else:
+                base_username = email.split("@")[0]
+                unique_username = f"{base_username}_{uuid.uuid4().hex[:6]}"
 
-            user = User(
-                username=unique_username,
-                email=email,
-                phone=None,
-                password=None,
-                full_name=user_info.get("name", "Google User"),
-                verification_state="verified",
-                is_verified=True,
-                email_verified=True,
-                phone_verified=False,
-                google_id=google_id,
-                is_admin=False
-            )
-            db.session.add(user)
+                user = User(
+                    username=unique_username,
+                    email=email,
+                    phone=None,
+                    password=None,
+                    full_name=user_info.get("name", "Google User"),
+                    verification_state="verified",
+                    is_verified=True,
+                    email_verified=True,
+                    phone_verified=False,
+                    google_id=google_id,
+                    is_admin=False
+                )
+                db.session.add(user)
 
-    db.session.commit()
+        db.session.commit()
 
-    access_token = create_access_token(identity=str(user.id))
+        access_token = create_access_token(identity=str(user.id))
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    return redirect(f"{frontend_url}/auth/callback?token={access_token}")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        redirect_url = f"{frontend_url}/auth/callback?token={access_token}"
+
+        print("DEBUG TOKEN:", access_token)
+        print("DEBUG REDIRECT TO:", redirect_url)
+
+        return redirect(redirect_url)
+
+    except Exception as e:
+        print("DEBUG GOOGLE CALLBACK ERROR:", repr(e))
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        return redirect(f"{frontend_url}/login?error=google_failed")
 
 
 # =========================
@@ -168,7 +179,7 @@ def get_current_user():
 
 
 # =========================
-# OTP (UNCHANGED SAFE)
+# OTP
 # =========================
 @auth_bp.route('/send-otp', methods=['POST'])
 def send_otp():
