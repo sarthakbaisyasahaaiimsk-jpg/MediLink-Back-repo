@@ -1,17 +1,30 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import os, uuid
+import requests as http_requests
 from werkzeug.utils import secure_filename
 from extensions import db
 from models import Case, User
-from supabase import create_client
 
 case_bp = Blueprint("cases", __name__)
 
-def get_supabase():
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    return create_client(url, key)
+def upload_to_supabase(file_bytes, filename, content_type):
+    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+    supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+
+    upload_url = f"{supabase_url}/storage/v1/object/uploads/{filename}"
+    headers = {
+        "Authorization": f"Bearer {supabase_key}",
+        "Content-Type": content_type,
+        "x-upsert": "true"
+    }
+
+    res = http_requests.post(upload_url, data=file_bytes, headers=headers)
+
+    if res.status_code not in (200, 201):
+        raise Exception(f"Supabase upload failed: {res.text}")
+
+    return f"{supabase_url}/storage/v1/object/public/uploads/{filename}"
 
 @case_bp.route("/cases", methods=["POST"])
 @jwt_required()
@@ -22,15 +35,12 @@ def create_case():
 
         data = request.form
 
-        # ✅ Safe age conversion
         age = data.get("patient_age")
         patient_age = int(age) if age and age.isdigit() else None
 
-        # ✅ Handle files — upload to Supabase
+        # ✅ Handle files — upload to Supabase via REST API
         files = request.files.getlist("files")
         file_urls = []
-
-        supabase = get_supabase()
 
         for f in files:
             if f and f.filename:
@@ -38,14 +48,7 @@ def create_case():
                 filename = f"{uuid.uuid4()}_{safe_name}"
                 file_bytes = f.read()
                 content_type = f.content_type or 'application/octet-stream'
-
-                supabase.storage.from_("uploads").upload(
-                    path=filename,
-                    file=file_bytes,
-                    file_options={"content-type": content_type}
-                )
-
-                public_url = supabase.storage.from_("uploads").get_public_url(filename)
+                public_url = upload_to_supabase(file_bytes, filename, content_type)
                 file_urls.append(public_url)
 
         new_case = Case(
