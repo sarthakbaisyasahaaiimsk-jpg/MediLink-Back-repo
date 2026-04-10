@@ -22,23 +22,25 @@ ZOTERO_API        = "https://api.zotero.org"
 
 
 def ref_to_csl(ref):
-    """Convert a SavedReference to Zotero-compatible CSL-JSON."""
     authors = []
+
     for name in (ref.authors or "").split(","):
         name = name.strip()
         if not name:
             continue
+
         parts = name.split(" ", 1)
         authors.append({
             "creatorType": "author",
-            "lastName": parts[0] if parts else name,
+            "lastName": parts[0],
             "firstName": parts[1] if len(parts) > 1 else ""
         })
+
     return {
         "itemType": "journalArticle",
-        "title": ref.title or "",
+        "title": ref.title or "Untitled",
         "creators": authors,
-        "date": ref.year or "",
+        "date": str(ref.year) if ref.year else "",
         "abstractNote": ref.abstract or "",
         "url": ref.url or "",
         "extra": f"PMID: {ref.pmid}" if ref.pmid else ""
@@ -55,8 +57,10 @@ def zotero_status():
 
     user = User.query.get(get_jwt_identity())
     connected = bool(
-        user.zotero_api_key and not user.zotero_api_key.startswith("pending:")
-    )
+    user.zotero_api_key
+    and user.zotero_user_id
+    and not user.zotero_api_key.startswith("pending:")
+)
     return jsonify({"connected": connected}), 200
 
 
@@ -137,7 +141,6 @@ def zotero_callback():
     return redirect(f"{FRONTEND_URL}/references?zotero=connected")
 
 
-# ── Step 3: Push selected (or all) refs to Zotero ────────
 @zotero_bp.route("/push", methods=["POST", "OPTIONS"])
 @cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
 @jwt_required()
@@ -148,11 +151,12 @@ def zotero_push():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    if not user.zotero_api_key or user.zotero_api_key.startswith("pending:"):
-        return jsonify({"error": "Zotero not connected"}), 403
+    # 🔴 Ensure Zotero is properly connected
+    if not user.zotero_api_key or not user.zotero_user_id:
+        return jsonify({"error": "Zotero not connected properly"}), 403
 
-    data  = request.get_json() or {}
-    pmids = data.get("pmids")  # optional — if omitted, push all saved refs
+    data = request.get_json() or {}
+    pmids = data.get("pmids")
 
     query = SavedReference.query.filter_by(user_id=user_id)
     if pmids:
@@ -162,44 +166,47 @@ def zotero_push():
     if not refs:
         return jsonify({"error": "No references found"}), 404
 
+    # Convert to Zotero format
     items = [ref_to_csl(r) for r in refs]
 
-    # Zotero accepts max 50 items per request
+    url = f"https://api.zotero.org/users/{user.zotero_user_id}/items"
+
     results = []
     for i in range(0, len(items), 50):
         chunk = items[i:i + 50]
-        resp = requests.post(
-            f"{ZOTERO_API}/users/{user.zotero_user_id}/items",
-            json=chunk,
-            headers={
-                "Zotero-API-Key": user.zotero_api_key,
-                "Zotero-API-Version": "3",
-                "Content-Type": "application/json"
-            }
-        )
-        if resp.status_code not in (200, 201):
+
+        try:
+            resp = requests.post(
+                url,
+                json=chunk,
+                headers={
+                    "Zotero-API-Key": user.zotero_api_key,
+                    "Zotero-API-Version": "3",
+                    "Content-Type": "application/json"
+                },
+                timeout=10  # ✅ prevent hanging
+            )
+
+            # 🔍 Debug logging (VERY IMPORTANT)
+            print("ZOTERO STATUS:", resp.status_code)
+            print("ZOTERO RESPONSE:", resp.text)
+
+            if resp.status_code not in (200, 201):
+                return jsonify({
+                    "error": "Zotero API error",
+                    "status": resp.status_code,
+                    "detail": resp.text
+                }), 502
+
+            results.append(resp.json())
+
+        except Exception as e:
             return jsonify({
-                "error": "Zotero API error",
-                "detail": resp.text
+                "error": "Request failed",
+                "detail": str(e)
             }), 502
-        results.append(resp.json())
 
     return jsonify({
         "message": f"{len(items)} reference(s) pushed to Zotero",
         "results": results
     }), 200
-
-
-# ── Disconnect ────────────────────────────────────────────
-@zotero_bp.route("/disconnect", methods=["DELETE", "OPTIONS"])
-@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
-@jwt_required()
-def zotero_disconnect():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
-    user = User.query.get(get_jwt_identity())
-    user.zotero_api_key = None
-    user.zotero_user_id = None
-    db.session.commit()
-    return jsonify({"message": "Disconnected"}), 200
