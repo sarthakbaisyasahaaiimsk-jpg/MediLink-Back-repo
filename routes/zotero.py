@@ -22,24 +22,34 @@ ZOTERO_API        = "https://api.zotero.org"
 
 
 def ref_to_csl(ref):
-    authors = []
+    """Convert a SavedReference to Zotero-compatible CSL-JSON."""
+
+    creators = []
 
     for name in (ref.authors or "").split(","):
         name = name.strip()
         if not name:
             continue
 
-        parts = name.split(" ", 1)
-        authors.append({
-            "creatorType": "author",
-            "lastName": parts[0],
-            "firstName": parts[1] if len(parts) > 1 else ""
-        })
+        parts = name.split()
+        
+        if len(parts) == 1:
+            # Only one name
+            creators.append({
+                "creatorType": "author",
+                "lastName": parts[0]
+            })
+        else:
+            creators.append({
+                "creatorType": "author",
+                "firstName": " ".join(parts[:-1]),
+                "lastName": parts[-1]
+            })
 
     return {
         "itemType": "journalArticle",
         "title": ref.title or "Untitled",
-        "creators": authors,
+        "creators": creators if creators else [],
         "date": str(ref.year) if ref.year else "",
         "abstractNote": ref.abstract or "",
         "url": ref.url or "",
@@ -57,9 +67,9 @@ def zotero_status():
 
     user = User.query.get(get_jwt_identity())
     connected = bool(
-    user.zotero_api_key
-    and user.zotero_user_id
-    and not user.zotero_api_key.startswith("pending:")
+       user.zotero_api_key
+       and user.zotero_user_id
+       and not user.zotero_api_key.startswith("pending:")
 )
     return jsonify({"connected": connected}), 200
 
