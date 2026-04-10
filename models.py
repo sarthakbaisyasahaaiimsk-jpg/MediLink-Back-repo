@@ -1,4 +1,5 @@
 from datetime import datetime
+import uuid
 from extensions import db
 import json
 
@@ -330,4 +331,33 @@ class Workshop(db.Model):
             'title': self.title,
             'link': self.link,
             'description': self.description
+        }
+    
+class SavedReference(db.Model):
+    __tablename__ = 'saved_references'
+
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    pmid = db.Column(db.String, nullable=False)
+    title = db.Column(db.Text)
+    authors = db.Column(db.Text)
+    abstract = db.Column(db.Text)
+    year = db.Column(db.String)
+    url = db.Column(db.String)
+    saved_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'pmid', name='unique_user_paper'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'pmid': self.pmid,
+            'title': self.title,
+            'authors': self.authors,
+            'abstract': self.abstract,
+            'year': self.year,
+            'url': self.url,
+            'saved_at': self.saved_at.isoformat()
         }

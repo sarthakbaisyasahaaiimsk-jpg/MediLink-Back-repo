@@ -134,9 +134,10 @@ def create_app():
 
     # Create tables + auto-migrate
     with app.app_context():
-        import models
-        db.create_all()
-        auto_add_missing_columns(app)
+       import models
+       from models import SavedReference
+       db.create_all()
+       auto_add_missing_columns(app)
 
     # WebSocket handlers
     from websocket_handlers import init_websocket
