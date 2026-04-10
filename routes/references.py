@@ -13,14 +13,18 @@ PUBMED_FETCH  = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
 CORS_ORIGINS = ["http://localhost:5173", "https://medilink-front-repo.onrender.com"]
 
-def fetch_pubmed(query, max_results=7):
+def fetch_pubmed(query, max_results=15, retstart=0):
     search_res = requests.get(PUBMED_SEARCH, params={
         "db": "pubmed", "term": query,
-        "retmode": "json", "retmax": max_results
+        "retmode": "json", "retmax": max_results,
+        "retstart": retstart,
+        "sort": "relevance",
     }).json()
+
+    total = int(search_res["esearchresult"]["count"])
     ids = search_res["esearchresult"]["idlist"]
     if not ids:
-        return []
+        return [], total
 
     fetch_res = requests.get(PUBMED_FETCH, params={
         "db": "pubmed", "id": ",".join(ids),
@@ -30,24 +34,24 @@ def fetch_pubmed(query, max_results=7):
     papers = []
     root = ET.fromstring(fetch_res.content)
     for article in root.findall(".//PubmedArticle"):
-        title = article.findtext(".//ArticleTitle") or ""
+        title    = article.findtext(".//ArticleTitle") or ""
         abstract = article.findtext(".//AbstractText") or ""
-        pmid = article.findtext(".//PMID") or ""
-        year = article.findtext(".//PubDate/Year") or ""
+        pmid     = article.findtext(".//PMID") or ""
+        year     = article.findtext(".//PubDate/Year") or ""
         authors_els = article.findall(".//Author")
         authors = ", ".join(
             f"{a.findtext('LastName') or ''} {a.findtext('Initials') or ''}".strip()
             for a in authors_els[:3]
         )
         papers.append({
-            "pmid": pmid,
-            "title": title,
+            "pmid":     pmid,
+            "title":    title,
             "abstract": abstract,
-            "authors": authors,
-            "year": year,
-            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+            "authors":  authors,
+            "year":     year,
+            "url":      f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
         })
-    return papers
+    return papers, total
 
 
 # ── Search ──────────────────────────────────────────────
@@ -56,12 +60,24 @@ def fetch_pubmed(query, max_results=7):
 def search_references():
     if request.method == "OPTIONS":
         return jsonify({}), 200
-    data = request.get_json()
-    query = data.get("query", "").strip()
+
+    data     = request.get_json()
+    query    = data.get("query", "").strip()
+    page     = int(data.get("page", 1))
+    retmax   = int(data.get("retmax", 15))
+    retstart = (page - 1) * retmax
+
     if not query:
         return jsonify({"error": "Query is required"}), 400
-    papers = fetch_pubmed(query)
-    return jsonify({"results": papers, "query": query})
+
+    papers, total = fetch_pubmed(query, max_results=retmax, retstart=retstart)
+    return jsonify({
+        "results":  papers,
+        "query":    query,
+        "total":    total,
+        "page":     page,
+        "has_more": (retstart + retmax) < total,
+    })
 
 
 # ── Save a paper ─────────────────────────────────────────
@@ -124,12 +140,12 @@ def get_saved_references():
         .order_by(SavedReference.saved_at.desc()).all()
 
     return jsonify({"results": [{
-        "id": r.id,
-        "pmid": r.pmid,
-        "title": r.title,
-        "authors": r.authors,
+        "id":       r.id,
+        "pmid":     r.pmid,
+        "title":    r.title,
+        "authors":  r.authors,
         "abstract": r.abstract,
-        "year": r.year,
-        "url": r.url,
+        "year":     r.year,
+        "url":      r.url,
         "saved_at": r.saved_at.isoformat()
     } for r in refs]}), 200
