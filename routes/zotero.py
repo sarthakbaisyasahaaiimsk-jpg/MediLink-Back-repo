@@ -22,8 +22,6 @@ ZOTERO_API        = "https://api.zotero.org"
 
 
 def ref_to_csl(ref):
-    """Convert a SavedReference to Zotero-compatible CSL-JSON."""
-
     creators = []
 
     for name in (ref.authors or "").split(","):
@@ -32,9 +30,8 @@ def ref_to_csl(ref):
             continue
 
         parts = name.split()
-        
+
         if len(parts) == 1:
-            # Only one name
             creators.append({
                 "creatorType": "author",
                 "lastName": parts[0]
@@ -48,11 +45,16 @@ def ref_to_csl(ref):
 
     return {
         "itemType": "journalArticle",
-        "title": ref.title or "Untitled",
-        "creators": creators if creators else [],
+        "title": (ref.title or "Untitled").strip(),
+        "creators": creators if creators else [
+            {
+                "creatorType": "author",
+                "name": "Unknown"
+            }
+        ],
         "date": str(ref.year) if ref.year else "",
-        "abstractNote": ref.abstract or "",
-        "url": ref.url or "",
+        "abstractNote": (ref.abstract or "").strip(),
+        "url": (ref.url or "").strip(),
         "extra": f"PMID: {ref.pmid}" if ref.pmid else ""
     }
 
