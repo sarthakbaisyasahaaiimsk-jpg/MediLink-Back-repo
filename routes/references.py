@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_cors import cross_origin
 import requests
 import xml.etree.ElementTree as ET
 
@@ -8,7 +9,6 @@ PUBMED_SEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_FETCH  = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
 def fetch_pubmed(query, max_results=7):
-    # Step 1: get IDs
     search_res = requests.get(PUBMED_SEARCH, params={
         "db": "pubmed", "term": query,
         "retmode": "json", "retmax": max_results
@@ -17,7 +17,6 @@ def fetch_pubmed(query, max_results=7):
     if not ids:
         return []
 
-    # Step 2: fetch abstracts
     fetch_res = requests.get(PUBMED_FETCH, params={
         "db": "pubmed", "id": ",".join(ids),
         "retmode": "xml", "rettype": "abstract"
@@ -46,8 +45,12 @@ def fetch_pubmed(query, max_results=7):
     return papers
 
 
-@references_bp.route("/api/references/search", methods=["POST"])
+@references_bp.route("/search", methods=["POST", "OPTIONS"])
+@cross_origin(origins=["http://localhost:5173", "https://medilink-front-repo.onrender.com"], supports_credentials=True)
 def search_references():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     data = request.get_json()
     query = data.get("query", "").strip()
     if not query:
