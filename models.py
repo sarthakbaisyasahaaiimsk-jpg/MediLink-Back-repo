@@ -18,6 +18,8 @@ class User(db.Model):
     verification_state = db.Column(db.String(50), default='pending')
     is_admin = db.Column(db.Boolean, default=False)
     google_id = db.Column(db.String(100), unique=True, nullable=True)
+    zotero_user_id  = db.Column(db.String, nullable=True)
+    zotero_api_key  = db.Column(db.String, nullable=True)
     
     def to_dict(self):
         return {

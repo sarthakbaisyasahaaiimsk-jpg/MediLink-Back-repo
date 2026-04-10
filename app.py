@@ -117,6 +117,8 @@ def create_app():
     from routes.uploads import upload_bp
     from routes.workshops import workshop_bp
     from routes.references import references_bp   # add this import
+    from routes.zotero import zotero_bp
+
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -131,6 +133,7 @@ def create_app():
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(workshop_bp, url_prefix="/api/workshops")
     app.register_blueprint(references_bp, url_prefix="/api/references")  # ADD THIS
+    app.register_blueprint(zotero_bp, url_prefix="/api/zotero")
 
     # Create tables + auto-migrate
     with app.app_context():
