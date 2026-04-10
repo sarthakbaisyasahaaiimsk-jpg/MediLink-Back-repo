@@ -260,7 +260,7 @@ class MedicalEvent(db.Model):
     is_free = db.Column(db.Boolean, default=True)
     price = db.Column(db.String(100))
     organizer = db.Column(db.String(200))
-    image_url = db.Column(db.String(300))
+    image_url = db.Column(db.Text)
     attendees = db.Column(db.Text)  # JSON string
     interested = db.Column(db.Text)  # JSON string
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
