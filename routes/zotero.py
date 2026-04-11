@@ -111,7 +111,7 @@ def zotero_connect():
     user.zotero_api_key = f"pending:{tokens['oauth_token']}:{tokens['oauth_token_secret']}"
     db.session.commit()
 
-    auth_url = f"{AUTHORIZE_URL}?oauth_token={tokens['oauth_token']}"
+    auth_url = f"{AUTHORIZE_URL}?oauth_token={tokens['oauth_token']}&library_access=1&write_access=1&all_groups=write"
     return jsonify({"auth_url": auth_url}), 200
 
 
@@ -222,3 +222,16 @@ def zotero_push():
         "message": f"{len(items)} reference(s) pushed to Zotero",
         "results": results
     }), 200
+
+@zotero_bp.route("/disconnect", methods=["DELETE", "OPTIONS"])
+@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
+@jwt_required()
+def zotero_disconnect():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
+    user = User.query.get(get_jwt_identity())
+    user.zotero_api_key = None
+    user.zotero_user_id = None
+    db.session.commit()
+    return jsonify({"message": "Disconnected"}), 200
