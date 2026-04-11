@@ -152,6 +152,39 @@ def zotero_callback():
 
     return redirect(f"{FRONTEND_URL}/references?zotero=connected")
 
+@zotero_bp.route("/collections", methods=["GET", "OPTIONS"])
+@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
+@jwt_required()
+def zotero_collections():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user.zotero_api_key or not user.zotero_user_id:
+        return jsonify({"error": "Zotero not connected"}), 403
+
+    resp = requests.get(
+        f"{ZOTERO_API}/users/{user.zotero_user_id}/collections",
+        headers={
+            "Zotero-API-Key": user.zotero_api_key,
+            "Zotero-API-Version": "3"
+        },
+        timeout=10
+    )
+
+    if resp.status_code != 200:
+        return jsonify({"error": "Failed to fetch collections"}), 502
+
+    collections = [
+        {
+            "key": c["key"],
+            "name": c["data"]["name"]
+        }
+        for c in resp.json()
+    ]
+
+    return jsonify({"collections": collections}), 200
 
 @zotero_bp.route("/push", methods=["POST", "OPTIONS"])
 @cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
