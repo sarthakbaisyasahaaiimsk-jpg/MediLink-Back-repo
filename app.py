@@ -116,9 +116,8 @@ def create_app():
     from routes.patient_cases import patient_cases_bp
     from routes.uploads import upload_bp
     from routes.workshops import workshop_bp
-    from routes.references import references_bp   # add this import
+    from routes.references import references_bp
     from routes.zotero import zotero_bp
-
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -132,15 +131,25 @@ def create_app():
     app.register_blueprint(patient_cases_bp, url_prefix="/api/patient-cases")
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(workshop_bp, url_prefix="/api/workshops")
-    app.register_blueprint(references_bp, url_prefix="/api/references")  # ADD THIS
+    app.register_blueprint(references_bp, url_prefix="/api/references")
     app.register_blueprint(zotero_bp, url_prefix="/api/zotero")
+
+    # Keep-alive health check (also wakes Neon DB)
+    @app.route("/health")
+    def health():
+        try:
+            db.session.execute(text("SELECT 1"))
+            db_status = "ok"
+        except Exception as e:
+            db_status = f"error: {e}"
+        return {"status": "ok", "db": db_status}, 200
 
     # Create tables + auto-migrate
     with app.app_context():
-       import models
-       from models import SavedReference
-       db.create_all()
-       auto_add_missing_columns(app)
+        import models
+        from models import SavedReference
+        db.create_all()
+        auto_add_missing_columns(app)
 
     # WebSocket handlers
     from websocket_handlers import init_websocket
@@ -149,7 +158,10 @@ def create_app():
     return app, socketio
 
 
+from keep_alive import start_keep_alive
+
 app, socketio = create_app()
+start_keep_alive()
 
 # if __name__ == "__main__":
 #     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
