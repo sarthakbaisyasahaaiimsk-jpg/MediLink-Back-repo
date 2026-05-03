@@ -118,6 +118,7 @@ def create_app():
     from routes.workshops import workshop_bp
     from routes.references import references_bp
     from routes.zotero import zotero_bp
+    from routes.admin import admin_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -133,6 +134,7 @@ def create_app():
     app.register_blueprint(workshop_bp, url_prefix="/api/workshops")
     app.register_blueprint(references_bp, url_prefix="/api/references")
     app.register_blueprint(zotero_bp, url_prefix="/api/zotero")
+    app.register_blueprint(admin_bp, url_prefix="/api/admin")
 
     # Keep-alive health check (also wakes Neon DB)
     @app.route("/health")
