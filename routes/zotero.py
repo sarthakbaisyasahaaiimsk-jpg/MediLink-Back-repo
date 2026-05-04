@@ -72,7 +72,7 @@ def zotero_status():
        user.zotero_api_key
        and user.zotero_user_id
        and not user.zotero_api_key.startswith("pending:")
-)
+    )
     return jsonify({"connected": connected}), 200
 
 
@@ -152,6 +152,8 @@ def zotero_callback():
 
     return redirect(f"{FRONTEND_URL}/references?zotero=connected")
 
+
+# ── Get collections ───────────────────────────────────────
 @zotero_bp.route("/collections", methods=["GET", "OPTIONS"])
 @cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
 @jwt_required()
@@ -186,6 +188,57 @@ def zotero_collections():
 
     return jsonify({"collections": collections}), 200
 
+
+# ── Create new collection ─────────────────────────────────
+@zotero_bp.route("/collections", methods=["POST", "OPTIONS"])
+@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
+@jwt_required()
+def create_collection():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user.zotero_api_key or not user.zotero_user_id:
+        return jsonify({"error": "Zotero not connected"}), 403
+
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    parent_key = data.get("parent_key")
+
+    if not name:
+        return jsonify({"error": "Collection name is required"}), 400
+
+    payload = {"name": name}
+    if parent_key:
+        payload["parentCollection"] = parent_key
+
+    resp = requests.post(
+        f"{ZOTERO_API}/users/{user.zotero_user_id}/collections",
+        json=[payload],
+        headers={
+            "Zotero-API-Key": user.zotero_api_key,
+            "Zotero-API-Version": "3",
+            "Content-Type": "application/json"
+        },
+        timeout=10
+    )
+
+    if resp.status_code not in (200, 201):
+        return jsonify({
+            "error": "Failed to create collection",
+            "detail": resp.text
+        }), 502
+
+    created = resp.json()
+    try:
+        new_key = list(created.get("success", {}).values())[0]
+        return jsonify({"key": new_key, "name": name}), 201
+    except Exception:
+        return jsonify({"message": "Collection created"}), 201
+
+
+# ── Push references ───────────────────────────────────────
 @zotero_bp.route("/push", methods=["POST", "OPTIONS"])
 @cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
 @jwt_required()
@@ -196,12 +249,12 @@ def zotero_push():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    # 🔴 Ensure Zotero is properly connected
     if not user.zotero_api_key or not user.zotero_user_id:
         return jsonify({"error": "Zotero not connected properly"}), 403
 
     data = request.get_json() or {}
     pmids = data.get("pmids")
+    collection_key = data.get("collection_key")
 
     query = SavedReference.query.filter_by(user_id=user_id)
     if pmids:
@@ -211,8 +264,12 @@ def zotero_push():
     if not refs:
         return jsonify({"error": "No references found"}), 404
 
-    # Convert to Zotero format
     items = [ref_to_csl(r) for r in refs]
+
+    # If a collection key is provided, tag each item with it
+    if collection_key:
+        for item in items:
+            item["collections"] = [collection_key]
 
     url = f"https://api.zotero.org/users/{user.zotero_user_id}/items"
 
@@ -229,10 +286,9 @@ def zotero_push():
                     "Zotero-API-Version": "3",
                     "Content-Type": "application/json"
                 },
-                timeout=10  # ✅ prevent hanging
+                timeout=10
             )
 
-            # 🔍 Debug logging (VERY IMPORTANT)
             print("ZOTERO STATUS:", resp.status_code)
             print("ZOTERO RESPONSE:", resp.text)
 
@@ -256,6 +312,8 @@ def zotero_push():
         "results": results
     }), 200
 
+
+# ── Disconnect ────────────────────────────────────────────
 @zotero_bp.route("/disconnect", methods=["DELETE", "OPTIONS"])
 @cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
 @jwt_required()
