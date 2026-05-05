@@ -12,21 +12,35 @@ community_bp = Blueprint('community', __name__)
 def create_forum():
     data = request.json
 
-    if not data.get("name"):
+    name = data.get("name")
+
+    if not name:
         return jsonify({"error": "Forum name required"}), 400
 
-    forum = Forum(
-        name=data.get("name"),
-        description=data.get("description"),
-        created_by=data.get("created_by"),
-        created_date=datetime.utcnow()
-    )
+    # 🔥 CHECK FOR DUPLICATE FIRST
+    existing_forum = Forum.query.filter_by(name=name).first()
+    if existing_forum:
+        return jsonify({
+            "error": "Forum already exists",
+            "forum": existing_forum.to_dict()
+        }), 409  # Conflict
 
-    db.session.add(forum)
-    db.session.commit()
+    try:
+        forum = Forum(
+            name=name,
+            description=data.get("description"),
+            created_by=data.get("created_by"),
+            created_date=datetime.utcnow()
+        )
 
-    return jsonify(forum.to_dict()), 201
+        db.session.add(forum)
+        db.session.commit()
 
+        return jsonify(forum.to_dict()), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # =========================
 # GET ALL FORUMS
