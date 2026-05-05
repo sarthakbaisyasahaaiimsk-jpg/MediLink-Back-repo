@@ -98,16 +98,20 @@ def create_app():
 
     # CORS
     CORS(
-    app,
-    resources={r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "https://medilink-front-repo.onrender.com"
-        ]
-    }},
-    supports_credentials=True
-   )
+        app,
+        resources={r"/*": {"origins": "*"}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
 
+    # Force headers (fallback)
+    @app.after_request
+    def after_request(response):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        return response
     # Blueprints
     from routes.auth import auth_bp
     from routes.case_comments import case_comments_bp
