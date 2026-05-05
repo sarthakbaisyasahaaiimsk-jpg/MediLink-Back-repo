@@ -103,7 +103,7 @@ class Message(db.Model):
             'file_url': self.file_url,
             'is_read': self.is_read,
             'read_by': json.loads(self.read_by) if self.read_by else [],
-            'created_date': self.created_date.isoformat(),
+            "created_date": self.created_date.isoformat() if self.created_date else None,
             'reactions': json.loads(self.reactions) if self.reactions else {},
             'is_pinned': self.is_pinned,
             'pinned_by': self.pinned_by,
