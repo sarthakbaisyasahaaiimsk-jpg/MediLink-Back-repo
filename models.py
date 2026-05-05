@@ -363,3 +363,139 @@ class SavedReference(db.Model):
             'url': self.url,
             'saved_at': self.saved_at.isoformat()
         }
+class Forum(db.Model):
+    __tablename__ = 'forum'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    tag = db.Column(db.String(100))
+    created_by = db.Column(db.String(120))  # user email
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'tag': self.tag,
+            'created_by': self.created_by,
+            'created_date': self.created_date.isoformat()
+        }
+
+
+class ForumPost(db.Model):
+    __tablename__ = 'forum_post'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    forum_id = db.Column(db.Integer, db.ForeignKey('forum.id'), nullable=False)
+
+    title = db.Column(db.String(255))
+    content = db.Column(db.Text)
+    tag = db.Column(db.String(100))
+
+    author_email = db.Column(db.String(120))
+    author_name = db.Column(db.String(200))
+
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    helpful_count = db.Column(db.Integer, default=0)
+    reply_count = db.Column(db.Integer, default=0)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'forum_id': self.forum_id,
+            'title': self.title,
+            'content': self.content,
+            'tag': self.tag,
+            'author_email': self.author_email,
+            'author_name': self.author_name,
+            'created_date': self.created_date.isoformat(),
+            'helpful_count': self.helpful_count,
+            'reply_count': self.reply_count
+        }
+    
+class ForumReply(db.Model):
+    __tablename__ = 'forum_reply'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    post_id = db.Column(db.Integer, db.ForeignKey('forum_post.id'), nullable=False)
+
+    content = db.Column(db.Text)
+
+    author_email = db.Column(db.String(120))
+    author_name = db.Column(db.String(200))
+
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    helpful_count = db.Column(db.Integer, default=0)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'content': self.content,
+            'author_email': self.author_email,
+            'author_name': self.author_name,
+            'created_date': self.created_date.isoformat(),
+            'helpful_count': self.helpful_count
+        }
+    
+class Forum(db.Model):
+    __tablename__ = 'forum'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True)
+    description = db.Column(db.Text)
+    created_by = db.Column(db.String(120))
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_by": self.created_by,
+            "created_date": self.created_date.isoformat()
+        }
+
+class Thread(db.Model):
+    __tablename__ = 'thread'
+
+    id = db.Column(db.Integer, primary_key=True)
+    forum_id = db.Column(db.Integer, db.ForeignKey('forum.id'))
+    title = db.Column(db.String(300))
+    content = db.Column(db.Text)
+    created_by = db.Column(db.String(120))
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "forum_id": self.forum_id,
+            "title": self.title,
+            "content": self.content,
+            "created_by": self.created_by,
+            "created_date": self.created_date.isoformat()
+        }
+
+class ThreadComment(db.Model):
+    __tablename__ = 'thread_comment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey('thread.id'))
+    content = db.Column(db.Text)
+    created_by = db.Column(db.String(120))
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "thread_id": self.thread_id,
+            "content": self.content,
+            "created_by": self.created_by,
+            "created_date": self.created_date.isoformat()
+        }        

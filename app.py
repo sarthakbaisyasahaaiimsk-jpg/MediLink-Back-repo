@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, session
+from flask import Flask, app, session
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from config import Config
@@ -120,6 +120,8 @@ def create_app():
     from routes.zotero import zotero_bp
     from routes.admin import admin_bp
     from routes.drugs import drugs_bp
+    from routes.forum_community import community_bp
+
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -137,6 +139,7 @@ def create_app():
     app.register_blueprint(zotero_bp, url_prefix="/api/zotero")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(drugs_bp, url_prefix="/api/drugs")
+    app.register_blueprint(community_bp, url_prefix='/api/community')
 
 
     # Keep-alive health check (also wakes Neon DB)
