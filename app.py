@@ -98,10 +98,15 @@ def create_app():
 
     # CORS
     CORS(
-        app,
-        supports_credentials=True,
-        resources={r"/api/*": {"origins": ["http://localhost:5173", "https://medilink-front-repo.onrender.com"]}}
-    )
+    app,
+    resources={r"/api/*": {
+        "origins": [
+            "http://localhost:5173",
+            "https://medilink-front-repo.onrender.com"
+        ]
+    }},
+    supports_credentials=True
+   )
 
     # Blueprints
     from routes.auth import auth_bp
