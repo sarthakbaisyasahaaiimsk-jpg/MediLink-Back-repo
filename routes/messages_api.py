@@ -75,7 +75,11 @@ def create_message():
             message_type=data.get('message_type', 'text'),
             file_url=data.get('file_url'),
             is_read=data.get('is_read', False),
-            read_by=json.dumps(data.get('read_by', []))
+            read_by=json.dumps(data.get('read_by', [])),
+            # ── E2E Encryption fields ──────────────────────────────────────────
+            is_encrypted=data.get('is_encrypted', False),
+            iv=data.get('iv'),              # AES-GCM IV sent by frontend
+            # ──────────────────────────────────────────────────────────────────
         )
         
         db.session.add(message)
@@ -132,7 +136,7 @@ def delete_message(id):
         return jsonify(error=str(e)), 500
 
 
-# ===== NEW ENDPOINTS FOR ADVANCED FEATURES =====
+# ===== ADVANCED FEATURES =====
 
 # Add or remove emoji reaction to message
 @messages_api_bp.route("/<int:id>/reactions", methods=["POST"])
@@ -249,6 +253,7 @@ def search_messages():
             search_query = search_query.filter_by(conversation_id=conversation_id)
         
         # Search in content (case-insensitive)
+        # Note: encrypted messages will not be searchable by content (by design)
         if query:
             search_query = search_query.filter(
                 Message.content.ilike(f"%{query}%")

@@ -14,7 +14,8 @@ import os
 def auto_add_missing_columns(app):
     from models import (
         User, Message, Conversation, Group, GroupMember,
-        Case, Comment, DoctorProfile, MedicalEvent, Workshop
+        Case, Comment, DoctorProfile, MedicalEvent, Workshop,
+        PublicKey  # ← added
     )
 
     inspector = inspect(db.engine)
@@ -29,7 +30,8 @@ def auto_add_missing_columns(app):
         Comment,
         DoctorProfile,
         MedicalEvent,
-        Workshop
+        Workshop,
+        PublicKey,  # ← added
     ]
 
     for model in model_list:
@@ -112,6 +114,7 @@ def create_app():
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
+
     # Blueprints
     from routes.auth import auth_bp
     from routes.case_comments import case_comments_bp
@@ -130,7 +133,7 @@ def create_app():
     from routes.admin import admin_bp
     from routes.drugs import drugs_bp
     from routes.forum_community import community_bp
-
+    from routes.keys import keys_bp  # ← added
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -149,7 +152,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(drugs_bp, url_prefix="/api/drugs")
     app.register_blueprint(community_bp, url_prefix='/api/community')
-
+    app.register_blueprint(keys_bp, url_prefix="/api/keys")  # ← added
 
     # Keep-alive health check (also wakes Neon DB)
     @app.route("/health")
@@ -164,7 +167,7 @@ def create_app():
     # Create tables + auto-migrate
     with app.app_context():
         import models
-        from models import SavedReference
+        from models import SavedReference, PublicKey  # ← added PublicKey
         db.create_all()
         auto_add_missing_columns(app)
 

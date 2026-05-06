@@ -2,6 +2,7 @@ from datetime import datetime
 import uuid
 from extensions import db
 import json
+from sqlalchemy import DateTime, func
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -72,24 +73,25 @@ class Message(db.Model):
     read_by = db.Column(db.Text)  # JSON string (list of emails)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # ===== NEW FIELDS FOR ADVANCED FEATURES =====
+    # ===== ADVANCED FEATURES =====
     # Reactions: JSON dict like {"❤️": ["email1", "email2"], "👍": ["email3"]}
     reactions = db.Column(db.Text, nullable=True)
     
     # Message Pinning
     is_pinned = db.Column(db.Boolean, default=False)
-    pinned_by = db.Column(db.String(120), nullable=True)  # email of who pinned
+    pinned_by = db.Column(db.String(120), nullable=True)
     pinned_date = db.Column(db.DateTime, nullable=True)
     
-    # Message Archiving (read-only, hidden from normal view)
+    # Message Archiving
     is_archived = db.Column(db.Boolean, default=False)
     archived_by = db.Column(db.String(120), nullable=True)
     archived_date = db.Column(db.DateTime, nullable=True)
     
-    # End-to-End Encryption
+    # ===== END-TO-END ENCRYPTION =====
     is_encrypted = db.Column(db.Boolean, default=False)
-    encrypted_content = db.Column(db.Text, nullable=True)
-    encryption_key_id = db.Column(db.String(50), nullable=True)
+    iv = db.Column(db.Text, nullable=True)              # ← AES-GCM IV (base64), used by frontend to decrypt
+    encrypted_content = db.Column(db.Text, nullable=True)   # legacy, kept for compatibility
+    encryption_key_id = db.Column(db.String(50), nullable=True)  # legacy, kept for compatibility
     
     def to_dict(self):
         return {
@@ -103,7 +105,7 @@ class Message(db.Model):
             'file_url': self.file_url,
             'is_read': self.is_read,
             'read_by': json.loads(self.read_by) if self.read_by else [],
-            "created_date": self.created_date.isoformat() if self.created_date else None,
+            'created_date': self.created_date.isoformat() if self.created_date else None,
             'reactions': json.loads(self.reactions) if self.reactions else {},
             'is_pinned': self.is_pinned,
             'pinned_by': self.pinned_by,
@@ -111,9 +113,11 @@ class Message(db.Model):
             'is_archived': self.is_archived,
             'archived_by': self.archived_by,
             'archived_date': self.archived_date.isoformat() if self.archived_date else None,
+            # E2E encryption fields
             'is_encrypted': self.is_encrypted,
+            'iv': self.iv,                              # ← frontend needs this to decrypt
             'encrypted_content': self.encrypted_content,
-            'encryption_key_id': self.encryption_key_id
+            'encryption_key_id': self.encryption_key_id,
         }
 
 
@@ -156,6 +160,14 @@ class Case(db.Model):
             'created_date': self.created_date.isoformat(),
             'discussion_count': self.discussion_count
         }
+
+
+class PublicKey(db.Model):
+    __tablename__ = 'public_keys'
+
+    user_id    = db.Column(db.Text, primary_key=True)   # doctor's email
+    public_key = db.Column(db.Text, nullable=False)      # base64 SPKI
+    updated_at = db.Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class Comment(db.Model):
@@ -334,7 +346,8 @@ class Workshop(db.Model):
             'link': self.link,
             'description': self.description
         }
-    
+
+
 class SavedReference(db.Model):
     __tablename__ = 'saved_references'
 
@@ -364,7 +377,7 @@ class SavedReference(db.Model):
             'saved_at': self.saved_at.isoformat()
         }
 
-    
+
 class Forum(db.Model):
     __tablename__ = 'forum'
 
@@ -376,12 +389,13 @@ class Forum(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "created_by": self.created_by,
-            "created_date": self.created_date.isoformat()
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'created_by': self.created_by,
+            'created_date': self.created_date.isoformat()
         }
+
 
 class Thread(db.Model):
     __tablename__ = 'thread'
@@ -395,13 +409,14 @@ class Thread(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id,
-            "forum_id": self.forum_id,
-            "title": self.title,
-            "content": self.content,
-            "created_by": self.created_by,
-            "created_date": self.created_date.isoformat()
+            'id': self.id,
+            'forum_id': self.forum_id,
+            'title': self.title,
+            'content': self.content,
+            'created_by': self.created_by,
+            'created_date': self.created_date.isoformat()
         }
+
 
 class ThreadComment(db.Model):
     __tablename__ = 'thread_comment'
@@ -414,9 +429,9 @@ class ThreadComment(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id,
-            "thread_id": self.thread_id,
-            "content": self.content,
-            "created_by": self.created_by,
-            "created_date": self.created_date.isoformat()
-        }        
+            'id': self.id,
+            'thread_id': self.thread_id,
+            'content': self.content,
+            'created_by': self.created_by,
+            'created_date': self.created_date.isoformat()
+        }
