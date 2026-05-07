@@ -34,12 +34,12 @@ RSS_FEEDS = [
     },
     {
         "source": "MOHFW",
-        "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+        "url": "url": "https://news.google.com/rss/search?q=Ministry+of+Health+India+MOHFW&hl=en-IN&gl=IN&ceid=IN:en",
         "fallback_url": "https://mohfw.gov.in/rss.xml",
     },
     {
         "source": "ICMR",
-        "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1pDJoLcwGKdJ_n7mDqGZrN2Ycp3D9VGH9TXvALrMo8_V9FqBHX/?limit=20&utm_campaign=pubmed-2&fc=20240101000000",
+        "url": "https://news.google.com/rss/search?q=ICMR+Indian+Council+Medical+Research&hl=en-IN&gl=IN&ceid=IN:en"
         "fallback_url": "https://www.icmr.gov.in/rss.xml",
     },
     {
