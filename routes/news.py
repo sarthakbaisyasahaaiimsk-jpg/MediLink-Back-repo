@@ -18,7 +18,7 @@ news_bp = Blueprint("news", __name__)
 RSS_FEEDS = [
     {
         "source": "WHO",
-        "url": "https://www.who.int/feeds/entity/news/en/rss.xml",
+        "url": "https://www.who.int/rss-feeds/news-english.xml",
     },
     {
         "source": "CDC",
@@ -26,11 +26,23 @@ RSS_FEEDS = [
     },
     {
         "source": "NIH",
-        "url": "https://www.nih.gov/news-events/news-releases/feed.xml",
+        "url": "https://nihrecord.nih.gov/rss.xml",
     },
     {
         "source": "NICE",
         "url": "https://www.nice.org.uk/news/feed",
+    },
+    {
+        "source": "MOHFW",
+        "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+    },
+    {
+        "source": "ICMR",
+        "url": "https://main.icmr.gov.in/rss.xml",
+    },
+    {
+        "source": "Hindu Health",
+        "url": "https://www.thehindu.com/sci-tech/health/feeder/default.rss",
     },
 ]
 
