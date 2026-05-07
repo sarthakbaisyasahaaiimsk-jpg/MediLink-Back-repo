@@ -21,7 +21,7 @@ class User(db.Model):
     google_id = db.Column(db.String(100), unique=True, nullable=True)
     zotero_user_id  = db.Column(db.String, nullable=True)
     zotero_api_key  = db.Column(db.String, nullable=True)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -67,32 +67,23 @@ class Message(db.Model):
     receiver_id = db.Column(db.Integer, nullable=True)
     group_id = db.Column(db.Integer, nullable=True)
     content = db.Column(db.Text, nullable=True)
-    message_type = db.Column(db.String(20), default="text")  # text, image, video, file, audio, case_reference
+    message_type = db.Column(db.String(20), default="text")
     file_url = db.Column(db.String(300), nullable=True)
     is_read = db.Column(db.Boolean, default=False)
-    read_by = db.Column(db.Text)  # JSON string (list of emails)
+    read_by = db.Column(db.Text)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # ===== ADVANCED FEATURES =====
-    # Reactions: JSON dict like {"❤️": ["email1", "email2"], "👍": ["email3"]}
     reactions = db.Column(db.Text, nullable=True)
-    
-    # Message Pinning
     is_pinned = db.Column(db.Boolean, default=False)
     pinned_by = db.Column(db.String(120), nullable=True)
     pinned_date = db.Column(db.DateTime, nullable=True)
-    
-    # Message Archiving
     is_archived = db.Column(db.Boolean, default=False)
     archived_by = db.Column(db.String(120), nullable=True)
     archived_date = db.Column(db.DateTime, nullable=True)
-    
-    # ===== END-TO-END ENCRYPTION =====
     is_encrypted = db.Column(db.Boolean, default=False)
-    iv = db.Column(db.Text, nullable=True)              # ← AES-GCM IV (base64), used by frontend to decrypt
-    encrypted_content = db.Column(db.Text, nullable=True)   # legacy, kept for compatibility
-    encryption_key_id = db.Column(db.String(50), nullable=True)  # legacy, kept for compatibility
-    
+    iv = db.Column(db.Text, nullable=True)
+    encrypted_content = db.Column(db.Text, nullable=True)
+    encryption_key_id = db.Column(db.String(50), nullable=True)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -113,9 +104,8 @@ class Message(db.Model):
             'is_archived': self.is_archived,
             'archived_by': self.archived_by,
             'archived_date': self.archived_date.isoformat() if self.archived_date else None,
-            # E2E encryption fields
             'is_encrypted': self.is_encrypted,
-            'iv': self.iv,                              # ← frontend needs this to decrypt
+            'iv': self.iv,
             'encrypted_content': self.encrypted_content,
             'encryption_key_id': self.encryption_key_id,
         }
@@ -134,14 +124,14 @@ class Case(db.Model):
     investigations = db.Column(db.Text)
     current_treatment = db.Column(db.Text)
     question = db.Column(db.Text)
-    specialty_tags = db.Column(db.String(500))  # JSON string
+    specialty_tags = db.Column(db.String(500))
     visibility = db.Column(db.String(20), default='public')
     status = db.Column(db.String(20), default='open')
-    attachments = db.Column(db.String(500))  # comma-separated file paths
-    created_by = db.Column(db.String(120))  # email
+    attachments = db.Column(db.String(500))
+    created_by = db.Column(db.String(120))
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     discussion_count = db.Column(db.Integer, default=0)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -164,9 +154,8 @@ class Case(db.Model):
 
 class PublicKey(db.Model):
     __tablename__ = 'public_keys'
-
-    user_id    = db.Column(db.Text, primary_key=True)   # doctor's email
-    public_key = db.Column(db.Text, nullable=False)      # base64 SPKI
+    user_id    = db.Column(db.Text, primary_key=True)
+    public_key = db.Column(db.Text, nullable=False)
     updated_at = db.Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
@@ -175,20 +164,20 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer)
     user_id = db.Column(db.Integer)
-    commenter_id = db.Column(db.String(120))  # email
+    commenter_id = db.Column(db.String(120))
     commenter_name = db.Column(db.String(200))
     commenter_specialty = db.Column(db.String(200))
-    commenter_qualifications = db.Column(db.Text)  # JSON string
+    commenter_qualifications = db.Column(db.Text)
     commenter_photo = db.Column(db.String(300))
     content = db.Column(db.Text)
     is_treatment_suggestion = db.Column(db.Boolean, default=False)
     likes = db.Column(db.Integer, default=0)
     dislikes = db.Column(db.Integer, default=0)
-    liked_by = db.Column(db.Text)  # JSON string (list of emails)
-    disliked_by = db.Column(db.Text)  # JSON string (list of emails)
-    replies = db.Column(db.Text)  # JSON string
+    liked_by = db.Column(db.Text)
+    disliked_by = db.Column(db.Text)
+    replies = db.Column(db.Text)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -212,12 +201,12 @@ class Comment(db.Model):
 class DoctorProfile(db.Model):
     __tablename__ = 'doctor_profile'
     id = db.Column(db.Integer, primary_key=True)
-    created_by = db.Column(db.String(120))  # email
+    created_by = db.Column(db.String(120))
     full_name = db.Column(db.String(200))
     profile_photo = db.Column(db.String(300))
     specialty = db.Column(db.String(200))
     sub_specialty = db.Column(db.String(200))
-    qualifications = db.Column(db.Text)  # JSON string
+    qualifications = db.Column(db.Text)
     registration_number = db.Column(db.String(100))
     location_city = db.Column(db.String(200))
     location_country = db.Column(db.String(200))
@@ -225,11 +214,11 @@ class DoctorProfile(db.Model):
     institution_name = db.Column(db.String(200))
     institution_type = db.Column(db.String(200))
     bio = db.Column(db.Text)
-    interests = db.Column(db.Text)  # JSON string
+    interests = db.Column(db.Text)
     response_count = db.Column(db.Integer, default=0)
     helpful_votes_received = db.Column(db.Integer, default=0)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -259,7 +248,7 @@ class MedicalEvent(db.Model):
     title = db.Column(db.String(200))
     description = db.Column(db.Text)
     event_type = db.Column(db.String(100))
-    specialties = db.Column(db.Text)  # JSON string
+    specialties = db.Column(db.Text)
     date = db.Column(db.DateTime)
     time = db.Column(db.String(50))
     end_date = db.Column(db.DateTime)
@@ -273,10 +262,10 @@ class MedicalEvent(db.Model):
     price = db.Column(db.String(100))
     organizer = db.Column(db.String(200))
     image_url = db.Column(db.Text)
-    attendees = db.Column(db.Text)  # JSON string
-    interested = db.Column(db.Text)  # JSON string
+    attendees = db.Column(db.Text)
+    interested = db.Column(db.Text)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -306,17 +295,17 @@ class MedicalEvent(db.Model):
 class Conversation(db.Model):
     __tablename__ = 'conversation'
     id = db.Column(db.Integer, primary_key=True)
-    participants = db.Column(db.Text)  # JSON string (list of emails)
-    participant_names = db.Column(db.Text)  # JSON string
-    participant_photos = db.Column(db.Text)  # JSON string
+    participants = db.Column(db.Text)
+    participant_names = db.Column(db.Text)
+    participant_photos = db.Column(db.Text)
     last_message = db.Column(db.Text)
     last_message_time = db.Column(db.DateTime, default=datetime.utcnow)
     last_message_sender = db.Column(db.String(120))
-    unread_count = db.Column(db.Text)  # JSON string
+    unread_count = db.Column(db.Text)
     is_group = db.Column(db.Boolean, default=False)
     group_name = db.Column(db.String(200))
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -338,7 +327,7 @@ class Workshop(db.Model):
     title = db.Column(db.String(200))
     link = db.Column(db.String(300))
     description = db.Column(db.Text)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -350,7 +339,6 @@ class Workshop(db.Model):
 
 class SavedReference(db.Model):
     __tablename__ = 'saved_references'
-
     id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     pmid = db.Column(db.String, nullable=False)
@@ -380,7 +368,6 @@ class SavedReference(db.Model):
 
 class Forum(db.Model):
     __tablename__ = 'forum'
-
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True)
     description = db.Column(db.Text)
@@ -399,7 +386,6 @@ class Forum(db.Model):
 
 class Thread(db.Model):
     __tablename__ = 'thread'
-
     id = db.Column(db.Integer, primary_key=True)
     forum_id = db.Column(db.Integer, db.ForeignKey('forum.id'))
     title = db.Column(db.String(300))
@@ -420,7 +406,6 @@ class Thread(db.Model):
 
 class ThreadComment(db.Model):
     __tablename__ = 'thread_comment'
-
     id = db.Column(db.Integer, primary_key=True)
     thread_id = db.Column(db.Integer, db.ForeignKey('thread.id'))
     content = db.Column(db.Text)
@@ -434,4 +419,60 @@ class ThreadComment(db.Model):
             'content': self.content,
             'created_by': self.created_by,
             'created_date': self.created_date.isoformat()
+        }
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CONTACT GROUPS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class ContactGroup(db.Model):
+    __tablename__ = 'contact_groups'
+
+    id         = db.Column(db.Integer, primary_key=True)
+    owner_id   = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name       = db.Column(db.String(100), nullable=False)
+    color      = db.Column(db.String(20), default='teal')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    owner   = db.relationship('User', foreign_keys=[owner_id])
+    members = db.relationship('ContactGroupMember', back_populates='group',
+                              cascade='all, delete-orphan')
+
+    def to_dict(self, include_members=True):
+        data = {
+            'id':           self.id,
+            'name':         self.name,
+            'color':        self.color,
+            'created_at':   self.created_at.isoformat(),
+            'member_count': len(self.members),
+        }
+        if include_members:
+            data['members'] = [m.to_dict() for m in self.members]
+        return data
+
+
+class ContactGroupMember(db.Model):
+    __tablename__ = 'contact_group_members'
+
+    id       = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('contact_groups.id'), nullable=False)
+    user_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    group = db.relationship('ContactGroup', back_populates='members')
+    user  = db.relationship('User', foreign_keys=[user_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('group_id', 'user_id', name='unique_group_member'),
+    )
+
+    def to_dict(self):
+        return {
+            'user_id':    self.user_id,
+            'added_at':   self.added_at.isoformat(),
+            'full_name':  self.user.full_name  if self.user else '',
+            'email':      self.user.email      if self.user else '',
+            'specialty':  '',   # DoctorProfile holds specialty, not User — fine to leave blank
+            'avatar_url': '',
         }
