@@ -26,19 +26,21 @@ RSS_FEEDS = [
     },
     {
         "source": "NIH",
-        "url": "https://nihrecord.nih.gov/rss.xml",
+        "url": "https://www.nih.gov/news-releases/feed.xml",
     },
     {
         "source": "NICE",
-        "url": "https://www.nice.org.uk/news/feed",
+        "url": "https://www.nice.org.uk/guidance/published/feed",
     },
     {
         "source": "MOHFW",
         "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+        "fallback_url": "https://mohfw.gov.in/rss.xml",
     },
     {
         "source": "ICMR",
-        "url": "https://main.icmr.gov.in/rss.xml",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1pDJoLcwGKdJ_n7mDqGZrN2Ycp3D9VGH9TXvALrMo8_V9FqBHX/?limit=20&utm_campaign=pubmed-2&fc=20240101000000",
+        "fallback_url": "https://www.icmr.gov.in/rss.xml",
     },
     {
         "source": "Hindu Health",
