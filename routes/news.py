@@ -39,7 +39,7 @@ RSS_FEEDS = [
     },
     {
         "source": "ICMR",
-        "url": "https://news.google.com/rss/search?q=ICMR+Indian+Council+Medical+Research&hl=en-IN&gl=IN&ceid=IN:en"
+        "url": "https://news.google.com/rss/search?q=ICMR+Indian+Council+Medical+Research&hl=en-IN&gl=IN&ceid=IN:en",
         "fallback_url": "https://www.icmr.gov.in/rss.xml",
     },
     {
