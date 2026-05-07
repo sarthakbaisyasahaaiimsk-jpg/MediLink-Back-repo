@@ -34,7 +34,7 @@ RSS_FEEDS = [
     },
     {
         "source": "MOHFW",
-        "url": "url": "https://news.google.com/rss/search?q=Ministry+of+Health+India+MOHFW&hl=en-IN&gl=IN&ceid=IN:en",
+        "url": "https://news.google.com/rss/search?q=Ministry+of+Health+India+MOHFW&hl=en-IN&gl=IN&ceid=IN:en",
         "fallback_url": "https://mohfw.gov.in/rss.xml",
     },
     {
