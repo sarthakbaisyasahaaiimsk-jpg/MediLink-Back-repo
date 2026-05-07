@@ -7,65 +7,12 @@ from datetime import datetime, timezone
 contacts_bp = Blueprint('contacts', __name__)
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# MODELS  (add these to your models.py)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#
-# class ContactGroup(db.Model):
-#     __tablename__ = 'contact_groups'
-#     id          = db.Column(db.Integer, primary_key=True)
-#     owner_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-#     name        = db.Column(db.String(100), nullable=False)
-#     color       = db.Column(db.String(20), default='teal')   # for UI badge color
-#     created_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-#     members     = db.relationship('ContactGroupMember', back_populates='group',
-#                                   cascade='all, delete-orphan')
-#
-# class ContactGroupMember(db.Model):
-#     __tablename__ = 'contact_group_members'
-#     id          = db.Column(db.Integer, primary_key=True)
-#     group_id    = db.Column(db.Integer, db.ForeignKey('contact_groups.id'), nullable=False)
-#     user_id     = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-#     added_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-#     group       = db.relationship('ContactGroup', back_populates='members')
-#     user        = db.relationship('User')
-#     __table_args__ = (db.UniqueConstraint('group_id', 'user_id'),)
-#
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# MIGRATION SQL (run once)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#
-# CREATE TABLE contact_groups (
-#   id         SERIAL PRIMARY KEY,
-#   owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-#   name       VARCHAR(100) NOT NULL,
-#   color      VARCHAR(20) DEFAULT 'teal',
-#   created_at TIMESTAMPTZ DEFAULT NOW()
-# );
-#
-# CREATE TABLE contact_group_members (
-#   id       SERIAL PRIMARY KEY,
-#   group_id INTEGER NOT NULL REFERENCES contact_groups(id) ON DELETE CASCADE,
-#   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-#   added_at TIMESTAMPTZ DEFAULT NOW(),
-#   UNIQUE(group_id, user_id)
-# );
-#
-# CREATE INDEX idx_contact_groups_owner ON contact_groups(owner_id);
-# CREATE INDEX idx_contact_members_group ON contact_group_members(group_id);
-# CREATE INDEX idx_contact_members_user  ON contact_group_members(user_id);
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# HELPERS
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 def serialize_group(group, include_members=True):
     data = {
-        "id":         group.id,
-        "name":       group.name,
-        "color":      group.color,
-        "created_at": group.created_at.isoformat(),
+        "id":           group.id,
+        "name":         group.name,
+        "color":        group.color,
+        "created_at":   group.created_at.isoformat(),
         "member_count": len(group.members),
     }
     if include_members:
@@ -81,20 +28,6 @@ def serialize_group(group, include_members=True):
             for m in group.members
         ]
     return data
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ROUTES
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-# GET  /contacts/groups          — list all groups for current user
-# POST /contacts/groups          — create a group
-# PUT  /contacts/groups/<id>     — rename / recolor a group
-# DELETE /contacts/groups/<id>   — delete a group
-# GET  /contacts/groups/<id>/members        — list members
-# POST /contacts/groups/<id>/members        — add a member
-# DELETE /contacts/groups/<id>/members/<uid> — remove a member
-# GET  /contacts/all             — flat list of all unique contacts across groups
 
 
 @contacts_bp.route("/groups", methods=["GET"])
@@ -120,7 +53,6 @@ def create_group():
     if len(name) > 100:
         return jsonify({"error": "Group name too long (max 100 chars)"}), 400
 
-    # Check for duplicate name for this owner
     exists = ContactGroup.query.filter_by(owner_id=owner_id, name=name).first()
     if exists:
         return jsonify({"error": "A group with this name already exists"}), 409
@@ -142,7 +74,6 @@ def update_group(group_id):
         name = data["name"].strip()
         if not name:
             return jsonify({"error": "Name cannot be empty"}), 400
-        # Check duplicate (exclude self)
         conflict = ContactGroup.query.filter(
             ContactGroup.owner_id == owner_id,
             ContactGroup.name == name,
@@ -183,19 +114,26 @@ def add_member(group_id):
     owner_id = get_jwt_identity()
     group    = ContactGroup.query.filter_by(id=group_id, owner_id=owner_id).first_or_404()
     data     = request.get_json() or {}
-    user_id  = data.get("user_id")
 
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    user_id = data.get("user_id")
+    email   = data.get("email")
+
+    # Resolve by email if user_id not provided
+    if not user_id and email:
+        target = User.query.filter_by(email=email).first()
+        if not target:
+            return jsonify({"error": "User not found"}), 404
+        user_id = target.id
+    elif user_id:
+        target = User.query.get(user_id)
+        if not target:
+            return jsonify({"error": "User not found"}), 404
+    else:
+        return jsonify({"error": "user_id or email is required"}), 400
 
     # Cannot add yourself
     if int(user_id) == int(owner_id):
         return jsonify({"error": "Cannot add yourself to a contact group"}), 400
-
-    # Verify target user exists
-    target = User.query.get(user_id)
-    if not target:
-        return jsonify({"error": "User not found"}), 404
 
     # Already a member?
     existing = ContactGroupMember.query.filter_by(
@@ -220,7 +158,6 @@ def add_member(group_id):
 @jwt_required()
 def remove_member(group_id, user_id):
     owner_id = get_jwt_identity()
-    # Verify ownership
     ContactGroup.query.filter_by(id=group_id, owner_id=owner_id).first_or_404()
 
     member = ContactGroupMember.query.filter_by(
@@ -235,10 +172,6 @@ def remove_member(group_id, user_id):
 @contacts_bp.route("/all", methods=["GET"])
 @jwt_required()
 def all_contacts():
-    """
-    Returns a flat, deduplicated list of all users the current user
-    has added across all their groups, with which groups they belong to.
-    """
     owner_id = get_jwt_identity()
     groups   = ContactGroup.query.filter_by(owner_id=owner_id).all()
 

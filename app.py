@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, app, session
+from flask import Flask, app, session, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from config import Config
@@ -31,9 +31,9 @@ def auto_add_missing_columns(app):
         DoctorProfile,
         MedicalEvent,
         Workshop,
-        PublicKey,  # ← added
-        ContactGroup,  # ← added
-        ContactGroupMember,  # ← added
+        PublicKey,
+        ContactGroup,
+        ContactGroupMember,
     ]
 
     for model in model_list:
@@ -100,19 +100,26 @@ def create_app():
         manage_session=True
     )
 
+    ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "https://medilink-front-repo.onrender.com"
+    ]
+
     # CORS
     CORS(
         app,
-        resources={r"/*": {"origins": "*"}},
+        resources={r"/*": {"origins": ALLOWED_ORIGINS}},
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
 
-    # Force headers (fallback)
     @app.after_request
     def after_request(response):
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
@@ -135,7 +142,7 @@ def create_app():
     from routes.admin import admin_bp
     from routes.drugs import drugs_bp
     from routes.forum_community import community_bp
-    from routes.keys import keys_bp  # ← added
+    from routes.keys import keys_bp
     from routes.contacts import contacts_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -155,7 +162,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(drugs_bp, url_prefix="/api/drugs")
     app.register_blueprint(community_bp, url_prefix='/api/community')
-    app.register_blueprint(keys_bp, url_prefix="/api/keys")  # ← added
+    app.register_blueprint(keys_bp, url_prefix="/api/keys")
     app.register_blueprint(contacts_bp, url_prefix='/api/contacts')
 
     # Keep-alive health check (also wakes Neon DB)
@@ -171,7 +178,7 @@ def create_app():
     # Create tables + auto-migrate
     with app.app_context():
         import models
-        from models import SavedReference, PublicKey  # ← added PublicKey
+        from models import SavedReference, PublicKey
         db.create_all()
         auto_add_missing_columns(app)
 
