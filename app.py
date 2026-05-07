@@ -152,6 +152,7 @@ def create_app():
     from routes.keys import keys_bp
     from routes.contacts import contacts_bp
     from routes.news import news_bp
+    from routes.prescriptions import prescriptions_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -173,6 +174,7 @@ def create_app():
     app.register_blueprint(keys_bp, url_prefix="/api/keys")
     app.register_blueprint(contacts_bp, url_prefix='/api/contacts')
     app.register_blueprint(news_bp, url_prefix="/api")
+    app.register_blueprint(prescriptions_bp, url_prefix="/api")
 
     # Keep-alive health check (also wakes Neon DB)
     @app.route("/health")

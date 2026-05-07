@@ -476,3 +476,28 @@ class ContactGroupMember(db.Model):
             'specialty':  '',   # DoctorProfile holds specialty, not User — fine to leave blank
             'avatar_url': '',
         }
+    
+
+
+class Prescription(db.Model):
+    __tablename__ = 'prescriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    disease = db.Column(db.String(200), nullable=False, index=True)
+    icd_code = db.Column(db.String(20))
+    source = db.Column(db.String(100))
+    last_updated = db.Column(db.String(20))
+    medications = db.Column(db.JSON)
+    contraindications = db.Column(db.JSON)
+    patient_groups = db.Column(db.JSON)
+
+    def to_dict(self):
+        return {
+            'disease': self.disease,
+            'icd_code': self.icd_code,
+            'source': self.source,
+            'last_updated': self.last_updated,
+            'medications': self.medications,
+            'contraindications': self.contraindications,
+            'patient_groups': self.patient_groups,
+        }
