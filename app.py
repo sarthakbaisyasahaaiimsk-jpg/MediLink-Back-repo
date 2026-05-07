@@ -75,8 +75,10 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     db_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    db_url = db_url.strip()
     db_url = db_url.replace("&amp;", "&")
     db_url = re.sub(r'[&?]channel_binding=[^&]*', '', db_url)
+    db_url = db_url.rstrip("&?")
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -149,7 +151,7 @@ def create_app():
     from routes.forum_community import community_bp
     from routes.keys import keys_bp
     from routes.contacts import contacts_bp
-    from routes.news import news_bp  
+    from routes.news import news_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -188,6 +190,24 @@ def create_app():
         from models import SavedReference, PublicKey
         db.create_all()
         auto_add_missing_columns(app)
+
+    # APScheduler — fetch news every 6 hours automatically
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    def run_news_fetch():
+        with app.app_context():
+            try:
+                from routes.news import fetch_and_store_all
+                print("[APScheduler] Running news fetch...")
+                results = fetch_and_store_all()
+                for source, info in results.items():
+                    print(f"  {source}: +{info['added']} new ({info['errors']} errors)")
+            except Exception as e:
+                print(f"[APScheduler] News fetch failed: {e}")
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(run_news_fetch, 'interval', hours=6)
+    scheduler.start()
 
     # WebSocket handlers
     from websocket_handlers import init_websocket
