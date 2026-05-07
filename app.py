@@ -9,6 +9,7 @@ from extensions import db, jwt
 from authlib.integrations.flask_client import OAuth
 from sqlalchemy import inspect, text
 import os
+import re
 
 
 def auto_add_missing_columns(app):
@@ -73,6 +74,10 @@ def auto_add_missing_columns(app):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    db_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    db_url = db_url.replace("&amp;", "&")
+    db_url = re.sub(r'[&?]channel_binding=[^&]*', '', db_url)
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
     app.config['SESSION_COOKIE_SAMESITE'] = 'None'
