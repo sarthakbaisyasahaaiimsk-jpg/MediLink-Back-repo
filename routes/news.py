@@ -148,18 +148,22 @@ def get_news():
     """
     GET /api/news
     Query params:
-      source  — filter by source name (WHO, CDC, NIH, NICE)
+      source  — filter by source name (case-insensitive: WHO, CDC, NIH, NICE, MOHFW, ICMR, Hindu Health)
       limit   — max articles (default 60, max 200)
       offset  — pagination offset
     """
-    source = request.args.get("source", "").strip().upper()
+    # FIX: preserve original casing from the request; use UPPER() in SQL for
+    # case-insensitive comparison so "Hindu Health" and "HINDU HEALTH" both match.
+    source = request.args.get("source", "").strip()
     limit  = min(int(request.args.get("limit",  60)), 200)
     offset = int(request.args.get("offset", 0))
 
     try:
         ensure_table()
 
-        where  = "WHERE source = :source" if source else ""
+        # FIX: case-insensitive WHERE clause so filtering works regardless of
+        # how the source name is cased in the DB or the request parameter.
+        where  = "WHERE UPPER(source) = UPPER(:source)" if source else ""
         params = {"limit": limit, "offset": offset}
         if source:
             params["source"] = source
