@@ -189,12 +189,12 @@ def summarise_drug_fields(drug_dict):
     }
     # Bullet caps per section — safety sections get more bullets
     CAPS = {
-        "warnings_boxed":    5,
-        "contraindications": 6,
-        "adverse_reactions": 10,
-        "drug_interactions": 8,
-        "warnings":          8,
-        "indications":       6,
+        "warnings_boxed":    50,
+        "contraindications": 50,
+        "adverse_reactions": 50,
+        "drug_interactions": 50,
+        "warnings":          50,
+        "indications":       50,
     }
     for field in TEXT_FIELDS:
         val = drug_dict.get(field)
