@@ -208,10 +208,17 @@ def summarise_drug_fields(drug_dict):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SOURCE 1 — OpenFDA
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+# ── FIX 1: fetch_openfda ─────────────────────────────────
+# Problem: quoted exact search `"Methotrexate"` fails because
+# FDA stores it as "METHOTREXATE SODIUM", "METHOTREXATE SODIUM
+# PRESERVATIVE FREE", etc.
+# Fix: use unquoted search so FDA does a contains-match,
+# then use best_fda_result() to pick the closest match.
+ 
 def fetch_openfda(name, rxcui):
     fda_result = None
-
+ 
+    # Strategy 1 — RxCUI (most precise, keep as-is)
     if rxcui:
         try:
             resp = requests.get(
@@ -223,13 +230,16 @@ def fetch_openfda(name, rxcui):
                 fda_result = best_fda_result(resp.json().get("results", []), name or rxcui)
         except Exception:
             pass
-
+ 
+    # Strategy 2 — unquoted name search across all three name fields
+    # CHANGED: removed quotes around name so FDA does a contains/token match
+    # e.g. "Methotrexate" now matches "METHOTREXATE SODIUM"
     if not fda_result and name:
         for field in ("openfda.generic_name", "openfda.substance_name", "openfda.brand_name"):
             try:
                 resp = requests.get(
                     f"{OPENFDA_URL}/label.json",
-                    params={"search": f'{field}:"{name.strip()}"', "limit": 5},
+                    params={"search": f"{field}:{name.strip()}", "limit": 10},
                     timeout=6
                 )
                 if resp.status_code == 200:
@@ -239,14 +249,15 @@ def fetch_openfda(name, rxcui):
                         break
             except Exception:
                 continue
-
+ 
+    # Strategy 3 — first-word fallback (unchanged)
     if not fda_result and name:
         first_word = name.strip().split()[0]
         if len(first_word) >= 4:
             try:
                 resp = requests.get(
                     f"{OPENFDA_URL}/label.json",
-                    params={"search": f'openfda.generic_name:"{first_word}"', "limit": 5},
+                    params={"search": f"openfda.generic_name:{first_word}", "limit": 10},
                     timeout=6
                 )
                 if resp.status_code == 200:
@@ -255,13 +266,13 @@ def fetch_openfda(name, rxcui):
                         fda_result = candidate
             except Exception:
                 pass
-
+ 
     if not fda_result:
         return {}
-
+ 
     r       = fda_result
     openfda = r.get("openfda", {})
-
+ 
     return {
         "brand_name":            safe_get(openfda, "brand_name"),
         "generic_name":          safe_get(openfda, "generic_name"),
@@ -561,50 +572,90 @@ def merge_sources(fda, dailymed, chembl):
 # ROUTES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# ── FIX 2: search_drugs route ────────────────────────────
+# Problem: RxNorm sometimes returns zero conceptProperties for
+# drugs like Methotrexate, leaving results empty and the user
+# with nothing to click — so the detail route never even runs.
+# Fix: if RxNorm returns nothing, fall back to a direct
+# OpenFDA NDC search so at least one result appears.
+ 
 @drugs_bp.route("/search", methods=["GET"])
 @jwt_required()
 def search_drugs():
     query = request.args.get("q", "").strip()
     limit = min(int(request.args.get("limit", 10)), 50)
-
+ 
     if not query:
         return jsonify({"error": "Query is required"}), 400
-
+ 
     try:
-        rxnorm_resp = requests.get(
-            f"{RXNORM_URL}/drugs.json",
-            params={"name": query},
-            timeout=6
-        )
-
         results = []
-
-        if rxnorm_resp.status_code == 200:
-            rx_data        = rxnorm_resp.json()
-            drug_group     = rx_data.get("drugGroup", {})
-            concept_groups = drug_group.get("conceptGroup", [])
-
-            seen = set()
-            for group in concept_groups:
-                for concept in group.get("conceptProperties", []):
-                    name  = concept.get("name", "")
-                    rxcui = concept.get("rxcui", "")
-                    tty   = concept.get("tty", "")
-
-                    key = (name.lower(), tty)
-                    if key not in seen and tty in ("IN", "BN", "SBD", "SCD", "MIN"):
-                        seen.add(key)
-                        results.append({
-                            "rxcui": rxcui,
-                            "name":  name,
-                            "type":  "Brand" if tty == "BN" else "Generic"
-                        })
-
+ 
+        # ── Primary: RxNorm (unchanged logic) ────────────
+        try:
+            rxnorm_resp = requests.get(
+                f"{RXNORM_URL}/drugs.json",
+                params={"name": query},
+                timeout=6
+            )
+            if rxnorm_resp.status_code == 200:
+                rx_data        = rxnorm_resp.json()
+                drug_group     = rx_data.get("drugGroup", {})
+                concept_groups = drug_group.get("conceptGroup", [])
+ 
+                seen = set()
+                for group in concept_groups:
+                    for concept in group.get("conceptProperties", []):
+                        name  = concept.get("name", "")
+                        rxcui = concept.get("rxcui", "")
+                        tty   = concept.get("tty", "")
+                        key   = (name.lower(), tty)
+                        # CHANGED: added BPCK and GPCK to catch pack-type entries
+                        if key not in seen and tty in ("IN", "BN", "SBD", "SCD", "MIN", "BPCK", "GPCK"):
+                            seen.add(key)
+                            results.append({
+                                "rxcui": rxcui,
+                                "name":  name,
+                                "type":  "Brand" if tty == "BN" else "Generic"
+                            })
+        except Exception:
+            pass
+ 
+        # ── Fallback: if RxNorm gave nothing, try OpenFDA NDC ──
+        # Catches drugs like Methotrexate where RxNorm search
+        # returns empty conceptProperties
+        if not results:
+            try:
+                ndc_resp = requests.get(
+                    f"{OPENFDA_URL}/ndc.json",
+                    params={
+                        "search": f"generic_name:{query}",
+                        "limit":  10
+                    },
+                    timeout=6
+                )
+                if ndc_resp.status_code == 200:
+                    seen_names = set()
+                    for item in ndc_resp.json().get("results", []):
+                        generic = item.get("generic_name", "")
+                        brand   = item.get("brand_name", "")
+                        # de-duplicate by generic name
+                        key = normalize(generic)
+                        if key and key not in seen_names:
+                            seen_names.add(key)
+                            results.append({
+                                "rxcui": "",          # no rxcui from NDC endpoint
+                                "name":  generic or brand,
+                                "type":  "Generic" if generic else "Brand"
+                            })
+            except Exception:
+                pass
+ 
         results = results[:limit]
         return jsonify({"results": results, "query": query}), 200
-
+ 
     except Exception as e:
-        return jsonify({"error": "RxNorm search failed", "detail": str(e)}), 502
+        return jsonify({"error": "Search failed", "detail": str(e)}), 502
 
 
 @drugs_bp.route("/detail", methods=["GET"])
