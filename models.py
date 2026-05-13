@@ -4,6 +4,29 @@ from extensions import db
 import json
 from sqlalchemy import DateTime, func
 
+class Follow(db.Model):
+    __tablename__ = 'follows'
+ 
+    id           = db.Column(db.Integer, primary_key=True)
+    follower_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    following_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+ 
+    __table_args__ = (
+        db.UniqueConstraint('follower_id', 'following_id', name='uq_follow'),
+    )
+ 
+    follower  = db.relationship('User', foreign_keys=[follower_id],  backref='following_rel')
+    following = db.relationship('User', foreign_keys=[following_id], backref='followers_rel')
+ 
+    def to_dict(self):
+        return {
+            'id':           self.id,
+            'follower_id':  self.follower_id,
+            'following_id': self.following_id,
+            'created_at':   self.created_at.isoformat(),
+        }
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
@@ -205,6 +228,7 @@ class DoctorProfile(db.Model):
     full_name = db.Column(db.String(200))
     profile_photo = db.Column(db.String(300))
     specialty = db.Column(db.String(200))
+    user_id= db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     sub_specialty = db.Column(db.String(200))
     qualifications = db.Column(db.Text)
     registration_number = db.Column(db.String(100))
@@ -215,6 +239,7 @@ class DoctorProfile(db.Model):
     institution_type = db.Column(db.String(200))
     bio = db.Column(db.Text)
     interests = db.Column(db.Text)
+    profile_visibility = db.Column(db.String(20), default='public')
     response_count = db.Column(db.Integer, default=0)
     helpful_votes_received = db.Column(db.Integer, default=0)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -225,6 +250,8 @@ class DoctorProfile(db.Model):
             'created_by': self.created_by,
             'full_name': self.full_name,
             'profile_photo': self.profile_photo,
+            'profile_visibility': self.profile_visibility or 'public',
+            'user_id': self.user_id,
             'specialty': self.specialty,
             'sub_specialty': self.sub_specialty,
             'qualifications': json.loads(self.qualifications) if self.qualifications else [],
@@ -249,6 +276,7 @@ class MedicalEvent(db.Model):
     description = db.Column(db.Text)
     event_type = db.Column(db.String(100))
     specialties = db.Column(db.Text)
+    created_by = db.Column(db.String(120), nullable=True)
     date = db.Column(db.DateTime)
     time = db.Column(db.String(50))
     end_date = db.Column(db.DateTime)
@@ -281,6 +309,7 @@ class MedicalEvent(db.Model):
             'venue': self.venue,
             'is_online': self.is_online,
             'online_link': self.online_link,
+            'created_by': self.created_by,
             'registration_link': self.registration_link,
             'is_free': self.is_free,
             'price': self.price,

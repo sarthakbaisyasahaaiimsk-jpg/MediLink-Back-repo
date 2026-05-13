@@ -16,7 +16,7 @@ def auto_add_missing_columns(app):
     from models import (
         User, Message, Conversation, Group, GroupMember,
         Case, Comment, DoctorProfile, MedicalEvent, Workshop,
-        PublicKey, ContactGroup, ContactGroupMember,
+        PublicKey, ContactGroup, ContactGroupMember, Follow
     )
 
     inspector = inspect(db.engine)
@@ -35,6 +35,7 @@ def auto_add_missing_columns(app):
         PublicKey,
         ContactGroup,
         ContactGroupMember,
+        Follow
     ]
 
     for model in model_list:
@@ -153,6 +154,8 @@ def create_app():
     from routes.contacts import contacts_bp
     from routes.news import news_bp
     from routes.prescriptions import prescriptions_bp
+    from routes.follows import follows_bp
+
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(case_comments_bp, url_prefix="/api/case-comments")
@@ -175,6 +178,7 @@ def create_app():
     app.register_blueprint(contacts_bp, url_prefix='/api/contacts')
     app.register_blueprint(news_bp, url_prefix="/api")
     app.register_blueprint(prescriptions_bp, url_prefix="/api")
+    app.register_blueprint(follows_bp, url_prefix="/api/follows")
 
     # Keep-alive health check (also wakes Neon DB)
     @app.route("/health")
