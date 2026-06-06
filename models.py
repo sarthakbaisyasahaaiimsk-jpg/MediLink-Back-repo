@@ -133,7 +133,128 @@ class Message(db.Model):
             'encryption_key_id': self.encryption_key_id,
         }
 
-
+class JobPosting(db.Model):
+    __tablename__ = "job_postings"
+ 
+    id              = db.Column(db.Integer, primary_key=True)
+    title           = db.Column(db.String(200), nullable=False)
+    institution     = db.Column(db.String(200))
+    location        = db.Column(db.String(200))
+    employment_type = db.Column(db.String(50))   # full-time / part-time / locum / fellowship
+    specialty       = db.Column(db.String(100))
+    description     = db.Column(db.Text)
+    requirements    = db.Column(db.Text)
+ 
+    # Salary
+    salary_min      = db.Column(db.Float)
+    salary_max      = db.Column(db.Float)
+    salary_currency = db.Column(db.String(10), default="INR")
+    salary_period   = db.Column(db.String(20), default="monthly")  # monthly / annual
+ 
+    contact_email   = db.Column(db.String(200))
+    deadline        = db.Column(db.String(50))   # ISO date string e.g. "2025-09-30"
+    posted_by       = db.Column(db.String(200), nullable=False)  # email of poster
+    is_active       = db.Column(db.Boolean, default=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at      = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+ 
+    # Relationship: one posting → many applications
+    applications    = db.relationship("JobApplication", backref="job", lazy=True, cascade="all, delete-orphan")
+ 
+    def to_dict(self):
+        return {
+            "id":               self.id,
+            "title":            self.title,
+            "institution":      self.institution,
+            "location":         self.location,
+            "employment_type":  self.employment_type,
+            "specialty":        self.specialty,
+            "description":      self.description,
+            "requirements":     self.requirements,
+            "salary_min":       self.salary_min,
+            "salary_max":       self.salary_max,
+            "salary_currency":  self.salary_currency,
+            "salary_period":    self.salary_period,
+            "contact_email":    self.contact_email,
+            "deadline":         self.deadline,
+            "posted_by":        self.posted_by,
+            "is_active":        self.is_active,
+            "application_count": len(self.applications),
+            "created_at":       self.created_at.isoformat() if self.created_at else None,
+        }
+    
+class JobApplication(db.Model):
+    __tablename__ = "job_applications"
+ 
+    id               = db.Column(db.Integer, primary_key=True)
+    job_id           = db.Column(db.Integer, db.ForeignKey("job_postings.id"), nullable=False)
+    applicant_email  = db.Column(db.String(200), nullable=False)
+    applicant_name   = db.Column(db.String(200))
+    cover_letter     = db.Column(db.Text)
+    cv_url           = db.Column(db.String(500))   # Supabase public URL
+    status           = db.Column(db.String(30), default="pending")  # pending / shortlisted / rejected
+    created_at       = db.Column(db.DateTime, default=datetime.utcnow)
+ 
+    def to_dict(self):
+        return {
+            "id":               self.id,
+            "job_id":           self.job_id,
+            "applicant_email":  self.applicant_email,
+            "applicant_name":   self.applicant_name,
+            "cover_letter":     self.cover_letter,
+            "cv_url":           self.cv_url,
+            "status":           self.status,
+            "created_at":       self.created_at.isoformat() if self.created_at else None,
+        }  
+    
+      
+class MedMarketListing(db.Model):
+    __tablename__ = "medmarket_listings"
+ 
+    id             = db.Column(db.Integer, primary_key=True)
+    title          = db.Column(db.String(200), nullable=False)
+    category       = db.Column(db.String(50))   # equipment / pharma / service / education / software / other
+    description    = db.Column(db.Text)
+    price          = db.Column(db.Float)
+    currency       = db.Column(db.String(10), default="INR")
+    price_type     = db.Column(db.String(30), default="fixed")   # fixed / negotiable / contact / free
+    condition      = db.Column(db.String(30))                    # new / like-new / good / fair
+    location       = db.Column(db.String(200))
+    contact_email  = db.Column(db.String(200))
+    contact_phone  = db.Column(db.String(50))
+    website_url    = db.Column(db.String(500))
+    images         = db.Column(db.Text)     # comma-separated Supabase public URLs
+    posted_by      = db.Column(db.String(200), nullable=False)
+    is_active      = db.Column(db.Boolean, default=True)
+    is_featured    = db.Column(db.Boolean, default=False)   # featured/sponsored listing
+    view_count     = db.Column(db.Integer, default=0)
+    enquiry_count  = db.Column(db.Integer, default=0)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at     = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+ 
+    def to_dict(self):
+        return {
+            "id":            self.id,
+            "title":         self.title,
+            "category":      self.category,
+            "description":   self.description,
+            "price":         self.price,
+            "currency":      self.currency,
+            "price_type":    self.price_type,
+            "condition":     self.condition,
+            "location":      self.location,
+            "contact_email": self.contact_email,
+            "contact_phone": self.contact_phone,
+            "website_url":   self.website_url,
+            "images":        self.images.split(",") if self.images else [],
+            "posted_by":     self.posted_by,
+            "is_active":     self.is_active,
+            "is_featured":   self.is_featured,
+            "view_count":    self.view_count,
+            "enquiry_count": self.enquiry_count,
+            "created_at":    self.created_at.isoformat() if self.created_at else None,
+        }
+    
 class Case(db.Model):
     __tablename__ = 'patient_case'
     id = db.Column(db.Integer, primary_key=True)

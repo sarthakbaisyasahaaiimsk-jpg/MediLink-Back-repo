@@ -227,5 +227,5 @@ from keep_alive import start_keep_alive
 app, socketio = create_app()
 start_keep_alive()
 
-# if __name__ == "__main__":
-#     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+if __name__ == "__main__":
+  socketio.run(app, debug=True, host="0.0.0.0", port=5000)
