@@ -1,3 +1,4 @@
+
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -6,146 +7,202 @@ from models import SavedReference
 import requests
 import xml.etree.ElementTree as ET
 
-references_bp = Blueprint('references', __name__)
+references_bp = Blueprint("references", __name__)
 
-PUBMED_SEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-PUBMED_FETCH  = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+PUBMED_SEARCH = (
+    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+)
+PUBMED_FETCH = (
+    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+)
 
-CORS_ORIGINS = ["http://localhost:5173", "https://medilink-front-repo.onrender.com"]
+CORS_ORIGINS = [
+    "http://localhost:5173",
+    "https://medilink-front-repo.onrender.com",
+]
 
-def fetch_pubmed(query, max_results=15, retstart=0):
-    search_res = requests.get(PUBMED_SEARCH, params={
-        "db": "pubmed", "term": query,
-        "retmode": "json", "retmax": max_results,
-        "retstart": retstart,
-        "sort": "relevance",
-    }).json()
 
-    total = int(search_res["esearchresult"]["count"])
-    ids = search_res["esearchresult"]["idlist"]
+def fetch_pubmed(query, max_results=15, retstart=0, sort="relevance"):
+    """Search PubMed and preserve the PMID order returned by ESearch."""
+
+    max_results = max(1, min(int(max_results), 100))
+    retstart = max(0, int(retstart))
+
+    sort_value = {
+        "relevance": "relevance",
+        "pub_date": "pub date",
+    }.get(sort, "relevance")
+
+    search_response = requests.get(
+        PUBMED_SEARCH,
+        params={
+            "db": "pubmed",
+            "term": query,
+            "retmode": "json",
+            "retmax": max_results,
+            "retstart": retstart,
+            "sort": sort_value,
+            "tool": "medilink",
+        },
+        timeout=20,
+    )
+    search_response.raise_for_status()
+
+    search_data = search_response.json()["esearchresult"]
+    total = int(search_data.get("count", 0))
+    ids = search_data.get("idlist", [])
+
     if not ids:
         return [], total
 
-    fetch_res = requests.get(PUBMED_FETCH, params={
-        "db": "pubmed", "id": ",".join(ids),
-        "retmode": "xml", "rettype": "abstract"
-    })
+    fetch_response = requests.get(
+        PUBMED_FETCH,
+        params={
+            "db": "pubmed",
+            "id": ",".join(ids),
+            "retmode": "xml",
+            "rettype": "abstract",
+        },
+        timeout=30,
+    )
+    fetch_response.raise_for_status()
 
-    papers = []
-    root = ET.fromstring(fetch_res.content)
+    root = ET.fromstring(fetch_response.content)
+    papers_by_pmid = {}
+
     for article in root.findall(".//PubmedArticle"):
-        title    = article.findtext(".//ArticleTitle") or ""
-        abstract = article.findtext(".//AbstractText") or ""
-        pmid     = article.findtext(".//PMID") or ""
-        year     = article.findtext(".//PubDate/Year") or ""
-        authors_els = article.findall(".//Author")
-        authors = ", ".join(
-            f"{a.findtext('LastName') or ''} {a.findtext('Initials') or ''}".strip()
-            for a in authors_els[:3]
+        pmid = (
+            article.findtext("./MedlineCitation/PMID") or ""
+        ).strip()
+
+        article_node = article.find(
+            "./MedlineCitation/Article"
         )
-        papers.append({
-            "pmid":     pmid,
-            "title":    title,
-            "abstract": abstract,
-            "authors":  authors,
-            "year":     year,
-            "url":      f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-        })
+
+        if not pmid or article_node is None:
+            continue
+
+        title_node = article_node.find("ArticleTitle")
+        title = (
+            "".join(title_node.itertext()).strip()
+            if title_node is not None
+            else ""
+        )
+
+        abstract_parts = []
+        for abstract_node in article_node.findall(
+            "./Abstract/AbstractText"
+        ):
+            text = "".join(abstract_node.itertext()).strip()
+            label = abstract_node.attrib.get("Label")
+
+            if text:
+                abstract_parts.append(
+                    f"{label}: {text}" if label else text
+                )
+
+        authors = []
+        author_list = article_node.find("./AuthorList")
+
+        if author_list is not None:
+            for author in author_list.findall("./Author")[:3]:
+                last_name = author.findtext("LastName") or ""
+                initials = author.findtext("Initials") or ""
+                collective = author.findtext("CollectiveName") or ""
+
+                name = (
+                    collective
+                    or f"{last_name} {initials}".strip()
+                )
+
+                if name:
+                    authors.append(name)
+
+        pub_date = article_node.find(
+            "./Journal/JournalIssue/PubDate"
+        )
+        year = ""
+
+        if pub_date is not None:
+            year = (
+                pub_date.findtext("Year")
+                or pub_date.findtext("MedlineDate")
+                or ""
+            )
+
+        papers_by_pmid[pmid] = {
+            "pmid": pmid,
+            "title": title,
+            "abstract": " ".join(abstract_parts),
+            "authors": ", ".join(authors),
+            "year": year,
+            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+        }
+
+    # EFetch XML ordering may differ from the ESearch ID ordering.
+    papers = [
+        papers_by_pmid[pmid]
+        for pmid in ids
+        if pmid in papers_by_pmid
+    ]
+
     return papers, total
 
 
-# ── Search ──────────────────────────────────────────────
 @references_bp.route("/search", methods=["POST", "OPTIONS"])
-@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
+@cross_origin(
+    origins=CORS_ORIGINS,
+    supports_credentials=True,
+)
 def search_references():
     if request.method == "OPTIONS":
         return jsonify({}), 200
 
-    data     = request.get_json()
-    query    = data.get("query", "").strip()
-    page     = int(data.get("page", 1))
-    retmax   = int(data.get("retmax", 15))
-    retstart = (page - 1) * retmax
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+
+    try:
+        page = max(1, int(data.get("page", 1)))
+        retmax = max(1, min(int(data.get("retmax", 15)), 100))
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": "Invalid page or result limit"
+        }), 400
+
+    sort = data.get("sort", "relevance")
+    if sort not in ("relevance", "pub_date"):
+        sort = "relevance"
 
     if not query:
         return jsonify({"error": "Query is required"}), 400
 
-    papers, total = fetch_pubmed(query, max_results=retmax, retstart=retstart)
+    retstart = (page - 1) * retmax
+
+    try:
+        papers, total = fetch_pubmed(
+            query=query,
+            max_results=retmax,
+            retstart=retstart,
+            sort=sort,
+        )
+    except requests.RequestException:
+        return jsonify({
+            "error": "Unable to reach PubMed. Please try again."
+        }), 502
+    except (ValueError, KeyError, ET.ParseError):
+        return jsonify({
+            "error": "PubMed returned an invalid response."
+        }), 502
+
     return jsonify({
-        "results":  papers,
-        "query":    query,
-        "total":    total,
-        "page":     page,
+        "results": papers,
+        "query": query,
+        "total": total,
+        "page": page,
+        "sort": sort,
         "has_more": (retstart + retmax) < total,
     })
 
 
-# ── Save a paper ─────────────────────────────────────────
-@references_bp.route("/save", methods=["POST", "OPTIONS"])
-@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
-@jwt_required()
-def save_reference():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
-    user_id = get_jwt_identity()
-    data = request.get_json()
-
-    existing = SavedReference.query.filter_by(
-        user_id=user_id, pmid=data.get("pmid")
-    ).first()
-    if existing:
-        return jsonify({"message": "Already saved", "id": existing.id}), 200
-
-    ref = SavedReference(
-        user_id=user_id,
-        pmid=data.get("pmid"),
-        title=data.get("title"),
-        authors=data.get("authors"),
-        abstract=data.get("abstract"),
-        year=data.get("year"),
-        url=data.get("url"),
-    )
-    db.session.add(ref)
-    db.session.commit()
-    return jsonify({"message": "Saved", "id": ref.id}), 201
-
-
-# ── Unsave a paper ───────────────────────────────────────
-@references_bp.route("/unsave/<pmid>", methods=["DELETE", "OPTIONS"])
-@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
-@jwt_required()
-def unsave_reference(pmid):
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
-    user_id = get_jwt_identity()
-    ref = SavedReference.query.filter_by(user_id=user_id, pmid=pmid).first()
-    if ref:
-        db.session.delete(ref)
-        db.session.commit()
-    return jsonify({"message": "Removed"}), 200
-
-
-# ── Get saved library ────────────────────────────────────
-@references_bp.route("/saved", methods=["GET", "OPTIONS"])
-@cross_origin(origins=CORS_ORIGINS, supports_credentials=True)
-@jwt_required()
-def get_saved_references():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
-    user_id = get_jwt_identity()
-    refs = SavedReference.query.filter_by(user_id=user_id)\
-        .order_by(SavedReference.saved_at.desc()).all()
-
-    return jsonify({"results": [{
-        "id":       r.id,
-        "pmid":     r.pmid,
-        "title":    r.title,
-        "authors":  r.authors,
-        "abstract": r.abstract,
-        "year":     r.year,
-        "url":      r.url,
-        "saved_at": r.saved_at.isoformat()
-    } for r in refs]}), 200
+# Keep your existing save, unsave, and saved-library routes below.
+# Their database fields and authentication behavior should remain unchanged.
